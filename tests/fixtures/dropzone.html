@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <body>
+    <h1>CV evaluator (Aurea-like test fixture)</h1>
+    <div>Drop your CV here</div>
+    <input type="file" id="cv" accept="application/pdf" />
+    <button id="analyze">Analyze my CV</button>
+    <div id="result"></div>
+    <script>
+      document.getElementById("analyze").addEventListener("click", () => {
+        const f = document.getElementById("cv").files[0];
+        const out = document.getElementById("result");
+        if (!f) {
+          out.innerText = "No file uploaded";
+          return;
+        }
+        const r = new FileReader();
+        r.onload = () => {
+          out.innerText =
+            "Evaluated " + f.name + " (" + f.size + " bytes): SCORE 42/100";
+        };
+        r.readAsArrayBuffer(f);
+      });
+    </script>
+  </body>
+</html>

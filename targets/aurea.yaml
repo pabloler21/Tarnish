@@ -1,0 +1,17 @@
+# Default target profile: Aurea (= bot_curriculum), a CV-evaluation agent whose only
+# input surface is an uploaded PDF. Adding another target is copying this file, not code.
+id: aurea
+name: "Aurea (bot_curriculum) - CV-evaluation agent"
+
+# The target's web page. The browser transport drives its real input surface;
+# `surface: auto` detects the dropzone/chat from the DOM (no per-target API wiring).
+url: "https://aurea.pablolerner.dev/"
+surface: auto
+
+owner_verified: true            # Aurea is your own target. Real ownership proof lands in Phase 3.
+
+# TODO(operator): set Aurea's model provider family so the judge is pinned to a DIFFERENT one
+# (anti score-inflation). e.g. openai | anthropic | google
+target_model_family: "REPLACE_ME"
+
+system_prompt: null             # set if exposed -> enables prompt_level verification (Phase 2)

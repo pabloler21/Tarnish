@@ -1,7 +1,35 @@
 [project]
 name = "tarnish"
 version = "0.1.0"
-description = "Add your description here"
+description = "Autonomous AI red-teaming system: find -> fix -> verify, traced in Langfuse."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "langfuse",                      # v4 SDK: get_client, observe, langfuse.langchain.CallbackHandler
+    "langgraph",                     # orchestration graph (Phase 1)
+    "langgraph-checkpoint-sqlite",   # SqliteSaver — campaign persistence
+    "pydantic>=2",                   # typed data models
+    "pydantic-settings",             # env-driven config
+    "pyyaml",                        # target profiles
+    "httpx",                         # transport delivery
+    "reportlab",                     # PDF crafting (Phase 0: clean control CV; hiding in Phase 1)
+    "typer",                         # CLI
+    "langchain>=1.3.16",
+    "playwright>=1.62.0",
+]
+
+[project.scripts]
+tarnish = "tarnish.cli:main"
+
+[dependency-groups]
+dev = ["pytest"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tarnish"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

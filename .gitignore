@@ -1,1 +1,18 @@
+# Project docs kept out of VCS (your existing choice — see report note)
 PLAN.md
+CLAUDE.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Secrets & local state
+.env
+.tarnish/
+*.sqlite
+
+# Campaign outputs
+reports/
