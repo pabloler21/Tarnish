@@ -1,0 +1,21 @@
+# Default target profile: Aurea (= bot_curriculum), a CV-evaluation agent whose only
+# input surface is an uploaded PDF. Adding another target is copying this file, not code.
+id: aurea
+name: "Aurea (bot_curriculum) - CV-evaluation agent"
+channel: pdf
+
+# TODO(operator): replace with Aurea's real endpoint that accepts the CV PDF upload.
+endpoint: "http://localhost:8000/evaluate"   # PLACEHOLDER
+
+owner_verified: true            # Aurea is your own target. Real ownership proof lands in Phase 3.
+
+# TODO(operator): set Aurea's model provider family so the judge is pinned to a DIFFERENT one
+# (anti score-inflation). e.g. openai | anthropic | google
+target_model_family: "REPLACE_ME"
+
+system_prompt: null             # set if exposed -> enables prompt_level verification (Phase 2)
+
+# Delivery contract (how the pdf channel POSTs to this target):
+upload_field: "file"            # multipart form field name Aurea expects
+upload_filename: "cv.pdf"
+headers: {}                     # add auth headers here if Aurea needs them
