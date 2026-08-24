@@ -7,6 +7,11 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+# Attack taxonomy (closed enums — structural guarantees, not free strings).
+Objective = Literal["instruction", "data", "leak", "jailbreak", "logic"]
+# PDF-channel-only hiding techniques. malicious_font (cmap remap) is Phase 2+.
+HidingTechnique = Literal["white_on_white", "tiny_font", "off_page", "metadata"]
+
 
 class TargetProfile(BaseModel):
     id: str
