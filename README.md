@@ -35,8 +35,13 @@ built cheapest-and-most-honest first:
 
 ```bash
 uv sync                      # create the venv, install deps + the project
+uv run playwright install chromium   # one-time: download the headless browser (~115MB)
 cp .env.example .env         # then fill in your Langfuse keys
 ```
+
+Tarnish drives a headless browser to attack web targets through their real input
+surface (a PDF dropzone, a chat box), so any "drop your CV" page works with no
+per-target API wiring.
 
 ## Phase 0 - foundation (current)
 
