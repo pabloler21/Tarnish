@@ -10,8 +10,5 @@ surface: auto
 
 owner_verified: true            # Aurea is your own target. Real ownership proof lands in Phase 3.
 
-# TODO(operator): set Aurea's model provider family so the judge is pinned to a DIFFERENT one
-# (anti score-inflation). e.g. openai | anthropic | google
-target_model_family: "REPLACE_ME"
-
+# target_model_family is optional and best-effort auto-detected — the operator never declares it.
 system_prompt: null             # set if exposed -> enables prompt_level verification (Phase 2)
