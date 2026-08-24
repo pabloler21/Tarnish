@@ -2,10 +2,11 @@
 # input surface is an uploaded PDF. Adding another target is copying this file, not code.
 id: aurea
 name: "Aurea (bot_curriculum) - CV-evaluation agent"
-channel: pdf
 
-# TODO(operator): replace with Aurea's real endpoint that accepts the CV PDF upload.
-endpoint: "http://localhost:8000/evaluate"   # PLACEHOLDER
+# The target's web page. The browser transport drives its real input surface;
+# `surface: auto` detects the dropzone/chat from the DOM (no per-target API wiring).
+url: "https://aurea.pablolerner.dev/"
+surface: auto
 
 owner_verified: true            # Aurea is your own target. Real ownership proof lands in Phase 3.
 
@@ -14,8 +15,3 @@ owner_verified: true            # Aurea is your own target. Real ownership proof
 target_model_family: "REPLACE_ME"
 
 system_prompt: null             # set if exposed -> enables prompt_level verification (Phase 2)
-
-# Delivery contract (how the pdf channel POSTs to this target):
-upload_field: "file"            # multipart form field name Aurea expects
-upload_filename: "cv.pdf"
-headers: {}                     # add auth headers here if Aurea needs them

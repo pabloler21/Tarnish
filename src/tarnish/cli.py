@@ -8,7 +8,7 @@ from langfuse import observe
 from .authz import assert_authorized
 from .config import load_target
 from .langfuse_setup import get_langfuse
-from .transport.pdf_channel import PDFChannel
+from .transport.browser import BrowserTransport
 
 app = typer.Typer(help="Tarnish — autonomous AI red-teaming (find -> fix -> verify).")
 
@@ -34,11 +34,11 @@ Skills: Python, PostgreSQL, Docker, REST APIs.
 
 
 @observe(name="gate0-benign-request")
-def _benign_request(target, content: str) -> str:
+def _benign_request(target, content: str, *, headless: bool = True) -> str:
     lf = get_langfuse()
-    response = PDFChannel().deliver(target, content)  # Phase 0: pdf channel only
+    response = BrowserTransport(headless=headless).deliver(target, content)
     lf.update_current_span(
-        input={"target": target.id, "channel": target.channel, "cv_chars": len(content)},
+        input={"target": target.id, "url": target.url, "cv_chars": len(content)},
         output={"status": "ok", "response_preview": response[:500]},
         metadata={"phase": "0", "gate": "gate0", "benign": True},
     )
@@ -46,14 +46,15 @@ def _benign_request(target, content: str) -> str:
 
 
 @app.command()
-def gate0(target: str = typer.Option("aurea", help="Target profile id (targets/<id>.yaml).")):
+def gate0(
+    target: str = typer.Option("aurea", help="Target profile id (targets/<id>.yaml)."),
+    headless: bool = typer.Option(True, help="Run the browser headless."),
+):
     """Phase 0 gate: send ONE benign request to the target and trace it in Langfuse. No attacks."""
     profile = load_target(target)
     assert_authorized(profile)
-    if profile.channel != "pdf":
-        raise typer.BadParameter("Phase 0 supports the pdf channel only; chat lands in Phase 2.")
 
-    response = _benign_request(profile, BENIGN_CV)
+    response = _benign_request(profile, BENIGN_CV, headless=headless)
     get_langfuse().flush()
 
     typer.echo(f"Benign request delivered to '{profile.id}'. Response preview:")

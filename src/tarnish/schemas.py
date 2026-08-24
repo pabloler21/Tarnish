@@ -5,19 +5,15 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class TargetProfile(BaseModel):
     id: str
     name: str
-    channel: Literal["pdf", "chat"]
-    endpoint: str
+    url: str  # the target's web page; the browser transport drives its real input surface
     owner_verified: bool  # authorization gate (real ownership proof enforced in Phase 3)
     target_model_family: str  # pins a different-family judge (anti score-inflation)
     system_prompt: str | None = None  # if exposed, enables prompt_level verification (Phase 2)
-
-    # Delivery contract for the pdf channel — kept in config so a new target is a YAML edit.
-    upload_field: str = "file"  # multipart field name the target expects
-    upload_filename: str = "cv.pdf"
-    headers: dict[str, str] = Field(default_factory=dict)
+    # "auto" = detect the surface from the DOM; override only when detection fails.
+    surface: Literal["auto", "pdf_upload", "text_chat"] = "auto"
