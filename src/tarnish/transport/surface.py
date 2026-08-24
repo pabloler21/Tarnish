@@ -15,9 +15,19 @@ class Surface:
     input_selector: str | None = None
 
 
+# Candidate elements for any attack surface we might recognize — wait for one to appear.
+_CANDIDATES = 'input[type="file"], textarea, input[type="text"], [contenteditable="true"]'
+
+
 class SurfaceDetector:
-    def detect(self, page) -> Surface:
-        """Classify the target's attack surface from its DOM."""
+    def detect(self, page, timeout_ms: int = 15000) -> Surface:
+        """Classify the target's attack surface from its DOM. SPAs render the surface
+        after hydration, so wait for a candidate element before classifying."""
+        try:
+            # state="attached": the file input is often hidden behind a styled dropzone.
+            page.wait_for_selector(_CANDIDATES, state="attached", timeout=timeout_ms)
+        except Exception:
+            pass  # nothing recognizable appeared within the window
         if page.query_selector('input[type="file"]'):
             return Surface(kind="pdf_upload", input_selector='input[type="file"]')
         return Surface(kind="unknown")

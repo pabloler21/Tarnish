@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import typer
 from langfuse import observe
 
@@ -51,6 +53,7 @@ def gate0(
     headless: bool = typer.Option(True, help="Run the browser headless."),
 ):
     """Phase 0 gate: send ONE benign request to the target and trace it in Langfuse. No attacks."""
+    get_langfuse()  # configure env + init the Langfuse client BEFORE the first @observe span
     profile = load_target(target)
     assert_authorized(profile)
 
@@ -62,6 +65,12 @@ def gate0(
 
 
 def main() -> None:
+    # Targets return arbitrary unicode; don't let a Windows cp1252 console crash the run.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     app()
 
 

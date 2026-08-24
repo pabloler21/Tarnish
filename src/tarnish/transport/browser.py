@@ -8,12 +8,19 @@ text_chat delivery + PDF hiding techniques land in Phase 1."""
 from __future__ import annotations
 
 import re
+import time
 
 from ..schemas import TargetProfile
 from .pdf_channel import PDFChannel
 from .surface import SurfaceDetector
 
 _SUBMIT_KEYWORDS = re.compile(r"analyz|analiz|evaluat|submit|upload|send|start", re.I)
+# "still working" markers — never return the loading state as if it were the response.
+_PROGRESS = re.compile(
+    r"analy[sz]ing|reading your|please wait|\bloading\b|thinking|processing|"
+    r"evaluating|may take|working on it|generating|one moment",
+    re.I,
+)
 
 
 class SurfaceUnknownError(RuntimeError):
@@ -44,32 +51,50 @@ class WebTarget:
 
 class ResponseReader:
     """Capture the target's rendered response after a payload is delivered.
-    Deliberately isolated — this is the fragile part and will be refined per target."""
+    Deliberately isolated — this is the fragile part and will be refined per target.
 
-    def read(self, page, before_text: str, timeout_ms: int = 20000) -> str:
-        page.wait_for_function(
-            "prev => document.body.innerText !== prev",
-            arg=before_text,
-            timeout=timeout_ms,
-        )
-        try:
-            page.wait_for_load_state("networkidle", timeout=3000)
-        except Exception:
-            pass  # some UIs render locally with no network settle
-        return page.inner_text("body")
+    The target renders a result only after its backend finishes, showing a static
+    'analyzing...' message meanwhile. `wait_for_load_state('networkidle')` is one-shot per
+    navigation and returns instantly for a later XHR, so instead we track the requests the
+    submit itself triggers and wait until: the DOM is stable, no tracked request is in
+    flight, and the text no longer looks like a loading state."""
+
+    def read_after(self, page, trigger, *, timeout_ms: int = 90000, settle_ms: int = 1200) -> str:
+        pending: set = set()
+        page.on("request", lambda r: pending.add(r))
+        page.on("requestfinished", lambda r: pending.discard(r))
+        page.on("requestfailed", lambda r: pending.discard(r))
+
+        trigger()  # perform the submit; the resulting requests are now tracked
+
+        deadline = time.monotonic() + timeout_ms / 1000
+        last = page.inner_text("body")
+        stable_since = time.monotonic()
+        while time.monotonic() < deadline:
+            page.wait_for_timeout(250)
+            current = page.inner_text("body")
+            if current != last:
+                last = current
+                stable_since = time.monotonic()
+                continue
+            stable = (time.monotonic() - stable_since) * 1000 >= settle_ms
+            if stable and not pending and not _PROGRESS.search(current):
+                break
+        return last
 
 
 class PdfUploadSurface:
     """Deliver a crafted PDF by uploading it through a file input and reading the result."""
 
     def deliver(self, page, surface, pdf_bytes: bytes) -> str:
-        before = page.inner_text("body")
-        page.set_input_files(
-            surface.input_selector,
-            files=[{"name": "cv.pdf", "mimeType": "application/pdf", "buffer": pdf_bytes}],
-        )
-        self._click_submit(page)
-        return ResponseReader().read(page, before)
+        def trigger():
+            page.set_input_files(
+                surface.input_selector,
+                files=[{"name": "cv.pdf", "mimeType": "application/pdf", "buffer": pdf_bytes}],
+            )
+            self._click_submit(page)
+
+        return ResponseReader().read_after(page, trigger)
 
     def _click_submit(self, page) -> None:
         """Best-effort: click an analyze/submit control if present (some dropzones auto-submit)."""
@@ -93,12 +118,13 @@ class BrowserTransport:
 
     channel = "web"
 
-    def __init__(self, *, headless: bool = True):
+    def __init__(self, *, headless: bool = True, detect_timeout_ms: int = 15000):
         self.headless = headless
+        self.detect_timeout_ms = detect_timeout_ms
 
     def deliver(self, target: TargetProfile, content: str, *, hiding: str | None = None) -> str:
         with WebTarget(target.url, headless=self.headless) as page:
-            surface = SurfaceDetector().detect(page)
+            surface = SurfaceDetector().detect(page, timeout_ms=self.detect_timeout_ms)
             if surface.kind == "pdf_upload":
                 if hiding is not None:
                     raise NotImplementedError("PDF hiding techniques land in Phase 1.")
