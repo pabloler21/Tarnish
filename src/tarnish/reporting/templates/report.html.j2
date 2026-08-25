@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tarnish report — {{ r.target.name }}</title>
+<style>
+  :root { --ink:#1a1a1a; --muted:#666; --line:#e2e2e2; --bg:#fafafa;
+          --crit:#b00020; --high:#c65100; --med:#8a6d00; --low:#4a4a4a; --ok:#0a7a3d; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.55 -apple-system, Segoe UI, Roboto, sans-serif; color: var(--ink);
+         max-width: 860px; margin: 0 auto; padding: 40px 24px; background: #fff; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  h2 { margin: 40px 0 12px; font-size: 20px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .summary { display: flex; gap: 24px; flex-wrap: wrap; background: var(--bg);
+             border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; }
+  .summary div { font-size: 13px; color: var(--muted); }
+  .summary b { display: block; font-size: 22px; color: var(--ink); }
+  .finding { border: 1px solid var(--line); border-radius: 8px; margin: 18px 0; overflow: hidden; }
+  .finding header { padding: 14px 18px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .sev { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+         text-transform: uppercase; padding: 2px 8px; border-radius: 4px; color: #fff; }
+  .sev.critical { background: var(--crit); } .sev.high { background: var(--high); }
+  .sev.medium { background: var(--med); } .sev.low { background: var(--low); }
+  .status { font-size: 12px; color: var(--muted); float: right; }
+  .part { padding: 14px 18px; border-top: 1px solid var(--line); }
+  .part:first-of-type { border-top: none; }
+  .label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+           color: var(--muted); margin: 0 0 6px; }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px;
+        white-space: pre-wrap; word-break: break-word; font-size: 13px; margin: 0; overflow-x: auto; }
+  .unverified { color: var(--high); font-weight: 600; }
+  .verified { color: var(--ok); font-weight: 600; }
+  footer { margin-top: 40px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 16px; }
+  ul { margin: 6px 0; padding-left: 20px; }
+</style>
+</head>
+<body>
+  <h1>Tarnish security report</h1>
+  <p class="sub">Target: <b>{{ r.target.name }}</b> — {{ r.target.url }}<br>
+     Generated {{ r.created_at.strftime("%Y-%m-%d %H:%M UTC") }}</p>
+
+  <div class="summary">
+    <div>Findings<b>{{ r.findings | length }}</b></div>
+    <div>New this run<b>{{ r.new_findings | length }}</b></div>
+    <div>Fixed this run<b>{{ r.fixed_findings | length }}</b></div>
+    <div>Critical / High<b>{{ r.findings | selectattr("severity","in",["critical","high"]) | list | length }}</b></div>
+  </div>
+
+  {% if not r.findings %}
+    <h2>No findings</h2>
+    <p>No attack in this campaign changed the target's evaluation relative to the clean control.</p>
+  {% endif %}
+
+  {% for f in r.findings %}
+  <div class="finding">
+    <header>
+      <span class="sev {{ f.severity }}">{{ f.severity }}</span>
+      &nbsp;{{ f.objective }} via {{ f.reproduction.payload.technique }}
+      <span class="status">{{ f.status }} · {{ f.fingerprint }}</span>
+    </header>
+
+    <div class="part">
+      <p class="label">1 · What's broken</p>
+      <p>{{ f.business_impact }}</p>
+    </div>
+
+    <div class="part">
+      <p class="label">2 · Proof it's broken</p>
+      <p class="label" style="margin-top:8px">Payload{% if f.reproduction.payload.hiding %} (hidden via {{ f.reproduction.payload.hiding }}){% endif %}</p>
+      <pre>{{ f.reproduction.payload.content }}</pre>
+      <p class="label" style="margin-top:10px">Target response</p>
+      <pre>{{ f.reproduction.raw_response }}</pre>
+      <p class="label" style="margin-top:10px">Control diff (the falsifiability guard)</p>
+      <pre>{{ f.control_diff }}</pre>
+    </div>
+
+    <div class="part">
+      <p class="label">3 · The fix</p>
+      <p><b>{{ f.remediation.remediation_class }}</b> — {{ f.remediation.detail }}</p>
+      <p style="color:var(--muted);font-size:13px">
+        Source: {% if f.remediation.tier == "static" %}static mapping{% else %}retrieved (grounded): {{ f.remediation.grounding | join(", ") }}{% endif %}
+      </p>
+    </div>
+
+    <div class="part">
+      <p class="label">4 · Proof the fix works</p>
+      {% if f.remediation.verification %}
+        <p class="verified">{{ f.remediation.verification.status }} via {{ f.remediation.verification.mode }}
+           ({{ f.remediation.verification.attempts_blocked }}/{{ f.remediation.verification.attempts_rerun }} blocked)</p>
+        <pre>{{ f.remediation.verification.evidence }}</pre>
+      {% else %}
+        <p class="unverified">Proposed, NOT verified.</p>
+        <p style="font-size:13px;color:var(--muted)">Apply the fix to the target and re-run the campaign
+           (<code>rescan</code>): if the finding no longer reproduces it flips to <code>fixed</code>.</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <h2>Methodology</h2>
+  <ul>
+    <li><b>Mandatory control.</b> Every campaign also submits the clean, un-injected CV. A finding
+        only holds if the evaluation changed relative to that control — the diff is shown per finding.</li>
+    <li><b>Binary, objective verdict.</b> Success = the target's evaluation reflects the injected
+        payload. No subjective quality scoring.</li>
+    <li><b>Two-stage PDF.</b> A payload must survive the parser (surfaced) and the model (acted on).</li>
+    <li><b>Judge.</b> A fixed configured model; falsifiability comes from the control, not the judge's family.</li>
+    <li><b>Verification claims are explicit.</b> An unverified fix says so; a <code>harness</code>
+        result is never presented as "the target is patched".</li>
+  </ul>
+
+  <footer>Tarnish — autonomous AI red-teaming (find → fix → verify). Report is a projection of the campaign; every finding is auditable above.</footer>
+</body>
+</html>
