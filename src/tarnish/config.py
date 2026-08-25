@@ -27,8 +27,14 @@ class Settings(BaseSettings):
     )
     langfuse_tracing_environment: str = "redteam"
 
+    # LLMs — OpenAI (attacker / judge / remediation). Configurable so model choice isn't hardcoded.
+    openai_api_key: str = ""
+    llm_model: str = "gpt-4o-mini"
+    embedding_model: str = "text-embedding-3-small"
+
     targets_dir: str = "targets"
     checkpoint_db: str = ".tarnish/checkpoints.sqlite"
+    chroma_dir: str = ".tarnish/chroma"
 
 
 @lru_cache(maxsize=1)

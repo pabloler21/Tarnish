@@ -62,7 +62,7 @@ def test_browser_transport_uploads_pdf_and_reads_response():
         id="fix", name="fix", url=(FIXTURES / "dropzone.html").as_uri(),
         owner_verified=True, target_model_family="openai",
     )
-    response = BrowserTransport().deliver(target, "Jane Doe\nSoftware Engineer")
+    response = BrowserTransport().deliver(target, visible="Jane Doe\nSoftware Engineer")
     assert "SCORE 42/100" in response  # the target's rendered response was read
     assert "cv.pdf" in response  # the crafted PDF actually rode the upload
 
@@ -128,4 +128,4 @@ def test_browser_transport_raises_on_unknown_surface(tmp_path):
         owner_verified=True, target_model_family="openai",
     )
     with pytest.raises(SurfaceUnknownError):
-        BrowserTransport(detect_timeout_ms=500).deliver(target, "x")
+        BrowserTransport(detect_timeout_ms=500).deliver(target, visible="x")
