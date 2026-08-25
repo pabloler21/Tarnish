@@ -12,7 +12,7 @@ from .authz import assert_authorized
 from .campaign import run_campaign
 from .config import load_target
 from .cv import BENIGN_CV
-from .langfuse_setup import get_langfuse
+from .langfuse_setup import get_langfuse, tracing_enabled
 from .reporting.render import render_to_file
 from .schemas import CampaignResult
 from .transport.browser import BrowserTransport
@@ -23,6 +23,12 @@ app = typer.Typer(help="Tarnish — autonomous AI red-teaming (find -> fix -> ve
 @app.callback()
 def _root() -> None:
     """Keep subcommands named (run/report/remediate/ci land alongside gate0 in later phases)."""
+
+
+def _tracing_hint() -> None:
+    """Say it once, at the end, ruff-style. Never a warning, never repeated."""
+    if not tracing_enabled():
+        typer.echo("tracing off — set LANGFUSE_PUBLIC_KEY/SECRET_KEY to trace this campaign")
 
 
 @observe(name="gate0-benign-request")
@@ -52,6 +58,7 @@ def gate0(
 
     typer.echo(f"Benign request delivered to '{profile.id}'. Response preview:")
     typer.echo(response[:1000])
+    _tracing_hint()
 
 
 @app.command()
@@ -71,6 +78,7 @@ def run(
     if report:
         html_path = render_to_file(result, json_path.with_suffix(".html"))
         typer.echo(f"Report: {html_path}")
+    _tracing_hint()
 
 
 @app.command()
