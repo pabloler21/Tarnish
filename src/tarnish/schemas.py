@@ -90,3 +90,20 @@ class Finding(BaseModel):
     remediation: Remediation
     status: Literal["new", "persisting", "fixed", "regression"] = "new"
     first_seen: datetime = Field(default_factory=_now)
+
+
+class Baseline(BaseModel):
+    target_id: str
+    accepted_fingerprints: list[str] = Field(default_factory=list)  # must NOT break the build
+    created_at: datetime = Field(default_factory=_now)
+
+
+class CampaignResult(BaseModel):
+    target: TargetProfile
+    findings: list[Finding] = Field(default_factory=list)
+    control_baseline: str = ""  # the evaluation of the clean, un-injected CV
+    coverage: dict = Field(default_factory=dict)  # attempts / successes per objective
+    new_findings: list[str] = Field(default_factory=list)  # fingerprints new this run
+    fixed_findings: list[str] = Field(default_factory=list)  # fingerprints closed this run
+    cost_usd: float = 0.0
+    created_at: datetime = Field(default_factory=_now)

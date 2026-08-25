@@ -13,8 +13,14 @@ class Transport(Protocol):
     channel: str
 
     def deliver(
-        self, target: TargetProfile, content: str, *, hiding: str | None = None
+        self,
+        target: TargetProfile,
+        *,
+        visible: str,
+        hidden: str | None = None,
+        hiding: str | None = None,
     ) -> str:
-        """Render `content` into the channel medium and deliver it; return the raw response text.
-        `hiding` is a PDF-channel-only concern (Phase 1); other channels ignore it."""
+        """Deliver to the target's surface and return the raw response text.
+        `visible` is the carrier (a clean CV); `hidden`+`hiding` embed an attack payload inside it
+        (PDF-only). Control runs pass `visible` alone; attacks pass `hidden`+`hiding`."""
         ...

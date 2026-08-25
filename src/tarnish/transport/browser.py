@@ -122,16 +122,31 @@ class BrowserTransport:
         self.headless = headless
         self.detect_timeout_ms = detect_timeout_ms
 
-    def deliver(self, target: TargetProfile, content: str, *, hiding: str | None = None) -> str:
+    def classify_surface(self, target: TargetProfile) -> str:
+        """Load the page and detect the input surface kind (the orchestrator's routing input)."""
+        if target.surface != "auto":
+            return target.surface
+        with WebTarget(target.url, headless=self.headless) as page:
+            return SurfaceDetector().detect(page, timeout_ms=self.detect_timeout_ms).kind
+
+    def deliver(
+        self,
+        target: TargetProfile,
+        *,
+        visible: str,
+        hidden: str | None = None,
+        hiding: str | None = None,
+    ) -> str:
         with WebTarget(target.url, headless=self.headless) as page:
             surface = SurfaceDetector().detect(page, timeout_ms=self.detect_timeout_ms)
             if surface.kind == "pdf_upload":
-                if hiding is not None:
-                    raise NotImplementedError("PDF hiding techniques land in Phase 1.")
-                pdf = PDFChannel().render(content)  # Phase 0: clean control CV
+                if hidden is None:
+                    pdf = PDFChannel().render(visible)  # clean control CV
+                else:
+                    pdf = PDFChannel().craft(visible, hidden=hidden, technique=hiding or "white_on_white")
                 return PdfUploadSurface().deliver(page, surface, pdf)
             if surface.kind == "text_chat":
-                raise NotImplementedError("text_chat delivery lands in Phase 1.")
+                raise NotImplementedError("text_chat delivery lands in Phase 2 (needs a chat target).")
             raise SurfaceUnknownError(
                 f"No recognizable attack surface at {target.url}. "
                 "Declare `surface` + a selector override in the target profile."
