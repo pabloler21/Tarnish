@@ -49,3 +49,30 @@ def test_error_names_all_three_routes(monkeypatch):
     message = str(excinfo.value)
     for route in ("claude", "codex", "OPENAI_API_KEY"):
         assert route in message
+
+
+from tarnish.agent_cli import AgentCliChatModel  # noqa: E402
+from tarnish.llm import get_chat_model  # noqa: E402
+
+
+def test_get_chat_model_returns_the_cli_model_when_a_cli_is_present(monkeypatch):
+    _only(monkeypatch, "claude")
+    monkeypatch.setattr(backends, "_forced_backend", lambda: "")
+    model = get_chat_model(temperature=0)
+    assert isinstance(model, AgentCliChatModel)
+    assert model.argv == ["claude", "-p"]
+
+
+def test_get_chat_model_falls_back_to_openai(monkeypatch):
+    _only(monkeypatch)
+    monkeypatch.setattr(backends, "_forced_backend", lambda: "")
+    monkeypatch.setattr(backends, "_api_keys", lambda: {"openai": "sk-x", "anthropic": ""})
+    assert type(get_chat_model()).__name__ == "ChatOpenAI"
+
+
+def test_get_chat_model_uses_anthropic_when_only_that_key_is_set(monkeypatch):
+    """The no-backend error promises ANTHROPIC_API_KEY as a route, so it must work."""
+    _only(monkeypatch)
+    monkeypatch.setattr(backends, "_forced_backend", lambda: "")
+    monkeypatch.setattr(backends, "_api_keys", lambda: {"openai": "", "anthropic": "sk-ant-x"})
+    assert type(get_chat_model()).__name__ == "ChatAnthropic"

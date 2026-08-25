@@ -8,13 +8,27 @@ from functools import lru_cache
 
 from fastembed import TextEmbedding
 from langchain_core.embeddings import Embeddings
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 
+from .agent_cli import AgentCliChatModel
+from .backends import ARGV, resolve_backend
 from .config import get_settings
 
 
-def get_chat_model(temperature: float = 0.7) -> ChatOpenAI:
+def get_chat_model(temperature: float = 0.7) -> BaseChatModel:
+    """Attack generation, judging and remediation all come through here. The backend is
+    resolved per call so tests and `llm_backend` overrides take effect without a restart."""
     s = get_settings()
+    backend = resolve_backend()
+    if backend in ARGV:
+        return AgentCliChatModel(argv=ARGV[backend], temperature=temperature)
+    if backend == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+
+        return ChatAnthropic(
+            model=s.anthropic_model, api_key=s.anthropic_api_key, temperature=temperature
+        )
     return ChatOpenAI(model=s.llm_model, api_key=s.openai_api_key, temperature=temperature)
 
 

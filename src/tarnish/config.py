@@ -27,7 +27,8 @@ class Settings(BaseSettings):
     )
     langfuse_tracing_environment: str = "redteam"
 
-    # LLMs — OpenAI (attacker / judge / remediation). Configurable so model choice isn't hardcoded.
+    # LLMs (attacker / judge / remediation). Backend is auto-detected: agent CLI first,
+    # API key as the fallback. See backends.resolve_backend.
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     # "" = auto-detect (see backends.resolve_backend). Set to force one:
@@ -35,7 +36,8 @@ class Settings(BaseSettings):
     llm_backend: str = Field(
         default="", validation_alias=AliasChoices("llm_backend", "tarnish_llm_backend")
     )
-    llm_model: str = "gpt-4o-mini"
+    llm_model: str = "gpt-4o-mini"          # used by the openai backend
+    anthropic_model: str = "claude-sonnet-5"  # used by the anthropic backend
     # fastembed model id (local, keyless). 384 dims — changing it invalidates .tarnish/chroma.
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
 
