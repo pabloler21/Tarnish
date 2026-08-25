@@ -29,6 +29,12 @@ class Settings(BaseSettings):
 
     # LLMs — OpenAI (attacker / judge / remediation). Configurable so model choice isn't hardcoded.
     openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    # "" = auto-detect (see backends.resolve_backend). Set to force one:
+    # claude_cli | codex_cli | openai | anthropic
+    llm_backend: str = Field(
+        default="", validation_alias=AliasChoices("llm_backend", "tarnish_llm_backend")
+    )
     llm_model: str = "gpt-4o-mini"
     # fastembed model id (local, keyless). 384 dims — changing it invalidates .tarnish/chroma.
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
