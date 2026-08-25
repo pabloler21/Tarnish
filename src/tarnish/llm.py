@@ -22,7 +22,13 @@ def get_chat_model(temperature: float = 0.7) -> BaseChatModel:
     s = get_settings()
     backend = resolve_backend()
     if backend in ARGV:
-        return AgentCliChatModel(argv=ARGV[backend], temperature=temperature)
+        argv = list(ARGV[backend])
+        if backend == "claude_cli":
+            # Pin the model: Claude Code's default (Opus 5) refuses red-team payload
+            # generation via its AUP safeguards ([cyber]); Opus 4.8 does not. VOLATILE id,
+            # so it lives in Settings — swap to `haiku` for a cheaper/faster run.
+            argv += ["--model", s.claude_model]
+        return AgentCliChatModel(argv=argv, temperature=temperature)
     if backend == "anthropic":
         from langchain_anthropic import ChatAnthropic
 

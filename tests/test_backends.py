@@ -60,7 +60,9 @@ def test_get_chat_model_returns_the_cli_model_when_a_cli_is_present(monkeypatch)
     monkeypatch.setattr(backends, "_forced_backend", lambda: "")
     model = get_chat_model(temperature=0)
     assert isinstance(model, AgentCliChatModel)
-    assert model.argv == ["claude", "-p"]
+    # The model is pinned (Opus 5 refuses attack-gen via AUP); id is volatile, so don't couple.
+    assert model.argv[:2] == ["claude", "-p"]
+    assert "--model" in model.argv
 
 
 def test_get_chat_model_falls_back_to_openai(monkeypatch):

@@ -10,6 +10,7 @@ LANGFUSE_TRACING_ENVIRONMENT env var (pattern ^(?!langfuse)[a-z0-9-_]+$, <=40 ch
 
 from __future__ import annotations
 
+import logging
 import os
 from functools import lru_cache
 
@@ -28,6 +29,14 @@ def _settings_keys() -> tuple[str, str]:
 def tracing_enabled() -> bool:
     public, secret = _settings_keys()
     return bool(public and secret)
+
+
+# @observe still spins up the SDK's global client, which logs a WARNING that it is "disabled"
+# when no keys are set. Off-by-default must be silent (a warning nags; the CLI says it once at
+# the end instead), so quiet the SDK's logger the moment we know tracing is off. Import-time,
+# because @observe fires before any get_langfuse() call in the decorated function's body.
+if not tracing_enabled():
+    logging.getLogger("langfuse").setLevel(logging.ERROR)
 
 
 class _NoopClient:

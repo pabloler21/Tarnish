@@ -37,6 +37,9 @@ class Settings(BaseSettings):
         default="", validation_alias=AliasChoices("llm_backend", "tarnish_llm_backend")
     )
     llm_model: str = "gpt-4o-mini"          # used by the openai backend
+    # used by the claude_cli backend. Opus 5 (the CLI default) refuses red-team payload
+    # generation via AUP safeguards; 4.8 does not. `haiku` is a cheaper/faster option.
+    claude_model: str = "claude-opus-4-8"
     anthropic_model: str = "claude-sonnet-5"  # used by the anthropic backend
     # fastembed model id (local, keyless). 384 dims — changing it invalidates .tarnish/chroma.
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
