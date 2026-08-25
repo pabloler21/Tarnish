@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     # LLMs — OpenAI (attacker / judge / remediation). Configurable so model choice isn't hardcoded.
     openai_api_key: str = ""
     llm_model: str = "gpt-4o-mini"
-    embedding_model: str = "text-embedding-3-small"
+    # fastembed model id (local, keyless). 384 dims — changing it invalidates .tarnish/chroma.
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
 
     targets_dir: str = "targets"
     checkpoint_db: str = ".tarnish/checkpoints.sqlite"
