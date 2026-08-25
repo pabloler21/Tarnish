@@ -62,6 +62,7 @@ def run(
     report: bool = typer.Option(True, help="Also render the HTML report next to the JSON."),
 ):
     """Run a full campaign: control + attacks -> evaluate -> remediate -> JSON + HTML report."""
+    get_langfuse()  # configure env + init the client BEFORE run_campaign's @observe span opens
     result, json_path = run_campaign(target, headless=headless, max_tasks=max_tasks or None)
 
     typer.echo(f"Campaign complete. {len(result.findings)} finding(s). JSON: {json_path}")
