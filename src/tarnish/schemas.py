@@ -42,6 +42,9 @@ class Payload(BaseModel):
     technique: str  # the specialist/technique that produced it
     content: str
     hiding: HidingTechnique | None = None  # PDF surface only
+    # Canary tokens planted in `content`. If any surfaces in the target's response but NOT in the
+    # control's, the payload provably landed — a deterministic, judge-free, reproducible oracle.
+    oracle: list[str] = Field(default_factory=list)
 
 
 class AttackAttempt(BaseModel):
