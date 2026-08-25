@@ -78,3 +78,13 @@ def test_structured_output_tolerates_a_fenced_block(monkeypatch):
     model = AgentCliChatModel(argv=["fake-cli"])
 
     assert model.with_structured_output(_Reply).invoke([("human", "judge this")]).verdict is False
+
+
+def test_error_surfaces_stdout_when_stderr_is_empty(monkeypatch):
+    """Agent CLIs (e.g. Claude Code's AUP refusal) put the message on stdout, exit nonzero,
+    and leave stderr empty. Discarding stdout there makes every refusal an opaque failure."""
+    monkeypatch.setattr(
+        subprocess, "run", _fake_run("Opus 5's safeguards flagged this message", returncode=1)
+    )
+    with pytest.raises(RuntimeError, match="safeguards flagged"):
+        AgentCliChatModel(argv=["claude", "-p"]).invoke([("human", "craft a payload")])

@@ -51,9 +51,10 @@ class AgentCliChatModel(BaseChatModel):
             errors="replace",
         )
         if completed.returncode != 0:
-            raise RuntimeError(
-                f"{' '.join(self.argv)} exited {completed.returncode}: {completed.stderr.strip()[:400]}"
-            )
+            # Agent CLIs put their real message on stdout (e.g. Claude Code's AUP refusal),
+            # leaving stderr empty. Prefer whichever stream carried it, or the error is opaque.
+            detail = (completed.stderr.strip() or completed.stdout.strip())[:400]
+            raise RuntimeError(f"{' '.join(self.argv)} exited {completed.returncode}: {detail}")
         message = AIMessage(content=completed.stdout.strip())
         return ChatResult(generations=[ChatGeneration(message=message)])
 
