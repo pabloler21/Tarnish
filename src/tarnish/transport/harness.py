@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from ..llm import get_chat_model
+from ..llm import get_chat_model, text_of
 from ..schemas import RepoProfile, Surface
 
 # A benign, domain-plausible input per surface kind — the mandatory control.
@@ -44,7 +44,12 @@ class HarnessTransport:
         return self.surface.kind if self.surface else "unknown"
 
     def control_input(self, target) -> str:
-        return _BENIGN[self.surface.kind if self.surface else "chat_input"]
+        if self.surface is None:
+            raise ValueError(
+                "profile has no matching surface for a control run — re-run `tarnish init`/"
+                "`explore` to refresh it"
+            )
+        return _BENIGN[self.surface.kind]
 
     def _system(self) -> str:
         prompt = self.profile.system_prompt.text
@@ -65,4 +70,4 @@ class HarnessTransport:
         response = get_chat_model(temperature=0).invoke(
             [("system", self._system()), ("human", content)]
         )
-        return response.content if isinstance(response.content, str) else str(response.content)
+        return text_of(response)

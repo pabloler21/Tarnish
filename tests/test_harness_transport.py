@@ -4,6 +4,8 @@ tool schemas, and a `CALL` protocol standing in for tool binding. No network, no
 
 from __future__ import annotations
 
+import pytest
+
 from tarnish.schemas import PromptRef, RepoProfile, Surface, ToolSpec
 from tarnish.transport import harness
 from tarnish.transport.harness import HarnessTransport
@@ -94,3 +96,16 @@ def test_browser_transport_declares_what_it_can_attack():
     from tarnish.transport.browser import BrowserTransport
 
     assert BrowserTransport.attackable == {"pdf_upload"}
+
+
+def test_control_input_raises_when_no_surface_matches(monkeypatch):
+    """A stored proof can outlive a refactor: `check` builds the transport from a baseline's
+    surface kind with no upstream gate. Silently returning a control for a surface that
+    classify_surface just called "unknown" would be a silently wrong CI verdict."""
+    _patched(monkeypatch)
+    empty = _profile().model_copy(update={"surfaces": []})
+    transport = HarnessTransport(empty)
+
+    assert transport.classify_surface(empty) == "unknown"
+    with pytest.raises(ValueError, match="tarnish init"):
+        transport.control_input(empty)

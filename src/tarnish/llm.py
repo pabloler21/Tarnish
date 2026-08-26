@@ -16,6 +16,21 @@ from .backends import ARGV, resolve_backend
 from .config import get_settings
 
 
+def text_of(response) -> str:
+    """Extract plain text from a chat model response. `.content` is a plain string for most
+    backends, but some (the API-key fallback backends) return a list of content blocks
+    (`[{"type": "text", "text": "..."}]`); `str()` on that list would leak Python repr noise
+    into evidence the report shows verbatim, so join the text blocks instead."""
+    content = response.content
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = [b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"]
+        if parts:
+            return "".join(parts)
+    return str(content)
+
+
 def get_chat_model(temperature: float = 0.7) -> BaseChatModel:
     """Attack generation, judging and remediation all come through here. The backend is
     resolved per call so tests and `llm_backend` overrides take effect without a restart."""
