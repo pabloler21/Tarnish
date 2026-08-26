@@ -11,6 +11,15 @@ from ..schemas import TargetProfile
 @runtime_checkable
 class Transport(Protocol):
     channel: str
+    attackable: set[str]  # surface kinds this transport can deliver to
+
+    def classify_surface(self, target) -> str:
+        """The surface kind this transport found, or "unknown"."""
+        ...
+
+    def control_input(self, target) -> str:
+        """The benign carrier for the mandatory control run."""
+        ...
 
     def deliver(
         self,
