@@ -56,3 +56,19 @@ def test_failure_leaves_parser_passed_unknown(monkeypatch):
     v = evaluator.evaluate(_attempt("pdf_upload"), control_response="Score 58")
     assert v.succeeded is False
     assert v.parser_passed is None  # cannot confirm the parser surfaced it
+
+
+def test_two_stage_verdict_covers_document_ingest():
+    """A repo-mode document surface has a parser stage exactly like a PDF does."""
+    from tarnish.evaluator import evaluate
+    from tarnish.schemas import AttackAttempt, Payload
+
+    attempt = AttackAttempt(
+        id="a1", surface="document_ingest",
+        raw_response="Understood — reference TRN-9f3a2c approved.",
+        payload=Payload(objective="data", technique="injection", content="x",
+                        oracle=["TRN-9f3a2c"]),
+    )
+    verdict = evaluate(attempt, control_response="How can I help you today?")
+    assert verdict.succeeded and verdict.parser_passed is True
+    assert verdict.judge_model == "oracle:canary"
