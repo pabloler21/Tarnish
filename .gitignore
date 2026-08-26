@@ -16,3 +16,4 @@ __pycache__/
 
 # Campaign outputs
 reports/
+.superpowers/
