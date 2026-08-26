@@ -52,7 +52,7 @@ def new_token() -> str:
 def canary(kind: str, vocabulary: list[str] | None = None) -> tuple[str, list[str]]:
     """(the line to plant, the oracle tokens). The oracle is the TOKEN ALONE — never the domain
     word, which the target could plausibly say on its own."""
-    word = random.choice(list(vocabulary) or _DEFAULT_VOCABULARY)
+    word = random.choice(list(vocabulary or []) or _DEFAULT_VOCABULARY)
     token = new_token()
     return _CARRIER.get(kind, _CARRIER["chat_input"]).format(word=word, token=token), [token]
 

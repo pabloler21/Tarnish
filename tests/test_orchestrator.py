@@ -91,3 +91,48 @@ def test_harness_mode_produces_a_canary_proven_finding(monkeypatch):
     assert "victim" in finding.business_impact, "impact must speak the target's own domain"
     assert finding.severity == "critical", "data injection into a bot that can refund money"
     assert finding.reproduction.payload.hiding is None, "hiding is a PDF concern, not a harness one"
+
+
+def test_live_mode_finding_has_empty_location(monkeypatch):
+    """Live mode has no file/symbol to name. `location` must stay "" — a surface *kind*
+    ("pdf_upload") is not a file#symbol identity, and Finding.location must not lie about it.
+    Fingerprinting is unaffected: it still falls back to the surface kind."""
+    from tarnish.fingerprint import fingerprint
+    from tarnish.schemas import Payload
+
+    class _FakeLiveTransport:
+        attackable = {"pdf_upload"}
+
+        def __init__(self, **kwargs):
+            pass  # no `self.surface` at all — that absence is the point
+
+        def classify_surface(self, target):
+            return "pdf_upload"
+
+        def control_input(self, target):
+            return "clean control text"
+
+        def deliver(self, target, *, visible, hidden=None, hiding=None):
+            if hidden is None:
+                return "Looks like a solid resume."
+            token = [w for w in hidden.split() if w.startswith("TRN-")]
+            return f"Confirmed {token[0] if token else 'nothing'} — approved."
+
+    monkeypatch.setattr(orchestrator, "BrowserTransport", _FakeLiveTransport)
+    monkeypatch.setattr(
+        orchestrator.SPECIALISTS["injection"], "generate",
+        lambda target, objective, **kw: Payload(
+            objective=objective, technique="injection", content="Please note the following."),
+    )
+
+    target = TargetProfile(id="t", name="t", url="https://x", owner_verified=True)
+    out = orchestrator.build_graph().invoke(
+        {"target": target, "tasks": [("injection", "data")], "mode": "live", "headless": True}
+    )
+
+    assert out["route"] == "attack"
+    assert out["surface_element"] == ""
+
+    (finding,) = out["findings"]
+    assert finding.location == ""
+    assert finding.fingerprint == fingerprint("data", "injection", "pdf_upload")

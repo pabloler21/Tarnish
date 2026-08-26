@@ -74,7 +74,10 @@ def _classify(state: CampaignState) -> dict:
         return {"surface": surface, "surface_element": "", "route": "unknown",
                 "control_response": ""}
     profiled = getattr(transport, "surface", None)  # repo mode only
-    element = surface_element(profiled.file, profiled.symbol) if profiled else surface
+    # Live mode has no profiled surface at all — leave "" so `location` stays honestly empty
+    # instead of a surface *kind* masquerading as a file#symbol identity. `_assess` already
+    # falls back to state["surface"] for fingerprinting, so this does not touch fingerprints.
+    element = surface_element(profiled.file, profiled.symbol) if profiled else ""
     control = transport.deliver(target, visible=transport.control_input(target))  # mandatory control
     return {"surface": surface, "surface_element": element, "route": "attack",
             "control_response": control}
