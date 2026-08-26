@@ -2,8 +2,8 @@
 
 Autonomous multi-agent system that red-teams an LLM-powered target through its own input
 surface, judges each attack against ground truth, **proposes a fix for every finding and
-proves the fix closes the hole**, traces everything in Langfuse, and exports a client-facing
-report. Find -> fix -> verify.
+proves the fix closes the hole**, and exports a client-facing report. Find -> fix -> verify.
+Runs on the coding-agent CLI you are already logged into: no API key, no account, no telemetry.
 
 > Working codename. Default target: **Aurea** (`bot_curriculum`), a CV-evaluation agent whose
 > only input surface is an uploaded PDF. The target is configurable (a YAML file), not hardcoded.
@@ -14,7 +14,8 @@ See `PLAN.md` for the full architecture and phase plan, and `CLAUDE.md` for buil
 
 - **`uv` only** - no pip/poetry/conda.
 - **Authorization gate** - Tarnish only attacks targets the operator has proven they own.
-- **Judge != target model family** - anti score-inflation.
+- **Falsifiability comes from the mandatory control**, not from knowing the target's model.
+  Operators paste a URL and don't know what model runs behind it, so Tarnish never asks.
 - **No finding without a proposed fix; no fix presented as verified without a re-run** - the
   same falsifiability discipline as the attack side.
 
@@ -34,26 +35,33 @@ built cheapest-and-most-honest first:
 ## Setup
 
 ```bash
-uv sync                      # create the venv, install deps + the project
-uv run playwright install chromium   # one-time: download the headless browser (~115MB)
-cp .env.example .env         # then fill in your Langfuse keys
+uv sync                              # create the venv, install deps + the project
+uv run playwright install chromium   # one-time: headless browser (~115MB), only for --live
 ```
+
+No API key needed if you have `claude` or `codex` on your PATH - Tarnish uses the coding-agent
+CLI you are already logged into. Otherwise put `OPENAI_API_KEY` in a `.env`.
 
 Tarnish drives a headless browser to attack web targets through their real input
 surface (a PDF dropzone, a chat box), so any "drop your CV" page works with no
 per-target API wiring.
 
-## Phase 0 - foundation (current)
+## Running a campaign
 
 ```bash
-uv run tarnish gate0 --target aurea
+uv run tarnish run --target aurea         # control + attacks -> evaluate -> remediate -> report
+uv run tarnish gate0 --target aurea       # one benign request only, no attacks
 ```
 
-Sends **one benign** request (a clean control CV) to the target through the transport layer and
-traces it in Langfuse under the `redteam` environment. No attacks yet.
+Findings land in `reports/<target>-<timestamp>.json` with an HTML report beside them.
 
-Before it can hit the real target you must, in `targets/aurea.yaml`, set the real `endpoint`
-and `target_model_family`, and put your Langfuse keys in `.env`.
+## Optional: tracing
+
+Tarnish runs with tracing off. A trace holds your system prompt, the payloads that worked and
+your unfixed vulnerabilities - a dossier on how to attack you - so it stays local unless you
+ask otherwise. To enable it, set `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`; point
+`LANGFUSE_HOST` at Langfuse Cloud or your own instance (the core is MIT and self-hostable).
+The report itself never depends on Langfuse - it renders from the campaign JSON.
 
 ## Tests
 

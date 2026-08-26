@@ -27,10 +27,22 @@ class Settings(BaseSettings):
     )
     langfuse_tracing_environment: str = "redteam"
 
-    # LLMs — OpenAI (attacker / judge / remediation). Configurable so model choice isn't hardcoded.
+    # LLMs (attacker / judge / remediation). Backend is auto-detected: agent CLI first,
+    # API key as the fallback. See backends.resolve_backend.
     openai_api_key: str = ""
-    llm_model: str = "gpt-4o-mini"
-    embedding_model: str = "text-embedding-3-small"
+    anthropic_api_key: str = ""
+    # "" = auto-detect (see backends.resolve_backend). Set to force one:
+    # claude_cli | codex_cli | openai | anthropic
+    llm_backend: str = Field(
+        default="", validation_alias=AliasChoices("llm_backend", "tarnish_llm_backend")
+    )
+    llm_model: str = "gpt-4o-mini"          # used by the openai backend
+    # used by the claude_cli backend. Opus 5 (the CLI default) refuses red-team payload
+    # generation via AUP safeguards; 4.8 does not. `haiku` is a cheaper/faster option.
+    claude_model: str = "claude-opus-4-8"
+    anthropic_model: str = "claude-sonnet-5"  # used by the anthropic backend
+    # fastembed model id (local, keyless). 384 dims — changing it invalidates .tarnish/chroma.
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
 
     targets_dir: str = "targets"
     checkpoint_db: str = ".tarnish/checkpoints.sqlite"
