@@ -15,6 +15,9 @@ from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.runnables import Runnable, RunnableLambda
+from pydantic import Field
+
+from .config import get_settings
 
 
 class AgentCliChatModel(BaseChatModel):
@@ -22,7 +25,9 @@ class AgentCliChatModel(BaseChatModel):
     CLIs do not expose it; callers pass it because ChatOpenAI did."""
 
     argv: list[str]
-    timeout: int = 180
+    # Defaults from Settings (tunable without a code change); an explicit timeout= from a
+    # caller (several tests rely on a short one) still wins over the setting.
+    timeout: int = Field(default_factory=lambda: get_settings().agent_cli_timeout)
     temperature: float = 0.7
 
     @property

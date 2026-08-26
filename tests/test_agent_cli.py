@@ -88,3 +88,28 @@ def test_error_surfaces_stdout_when_stderr_is_empty(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="safeguards flagged"):
         AgentCliChatModel(argv=["claude", "-p"]).invoke([("human", "craft a payload")])
+
+
+def test_default_timeout_comes_from_settings(monkeypatch):
+    """The 180s literal killed a real campaign (a nested agent-CLI call with a RAG-assembled
+    prompt outran it). It must be tunable via Settings, not another guess in the same spot."""
+    from tarnish.config import get_settings
+
+    monkeypatch.setenv("AGENT_CLI_TIMEOUT", "900")
+    get_settings.cache_clear()
+    try:
+        assert AgentCliChatModel(argv=["fake-cli"]).timeout == 900
+    finally:
+        get_settings.cache_clear()
+
+
+def test_explicit_timeout_overrides_settings(monkeypatch):
+    """A caller (several tests do) that passes timeout= explicitly still wins over Settings."""
+    from tarnish.config import get_settings
+
+    monkeypatch.setenv("AGENT_CLI_TIMEOUT", "900")
+    get_settings.cache_clear()
+    try:
+        assert AgentCliChatModel(argv=["fake-cli"], timeout=5).timeout == 5
+    finally:
+        get_settings.cache_clear()

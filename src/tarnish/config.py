@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # generation via AUP safeguards; 4.8 does not. `haiku` is a cheaper/faster option.
     claude_model: str = "claude-opus-4-8"
     anthropic_model: str = "claude-sonnet-5"  # used by the anthropic backend
+    # A nested agent-CLI call carrying a RAG-assembled prompt routinely outruns a short
+    # timeout; a trip kills the whole campaign, including work (e.g. the control run)
+    # that already succeeded. Raise it rather than guessing a bigger constant in code.
+    agent_cli_timeout: int = 600
     # fastembed model id (local, keyless). 384 dims — changing it invalidates .tarnish/chroma.
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
 
