@@ -19,3 +19,9 @@ def fingerprint(objective: str, technique: str, surface_element: str) -> str:
     """Stable 16-hex-char identity for (objective, technique, surface_element)."""
     raw = "|".join(_normalize(p) for p in (objective, technique, surface_element))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def surface_element(file: str, symbol: str) -> str:
+    """The attacked surface element in repo mode. NEVER include the line: lines move on every
+    refactor, and each move would invent a fake `new` finding and break the regression gate."""
+    return f"{file}#{symbol}"
