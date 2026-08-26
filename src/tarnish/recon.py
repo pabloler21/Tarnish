@@ -41,19 +41,22 @@ _SYSTEM = (
 
 def candidate_files(root: str | Path, limit: int = 12) -> list[Path]:
     """The files worth showing the model: source, not vendored, mentioning an LLM/prompt/tool.
-    ponytail: smallest-first so a prompt module beats a bundle; raise `limit` for large repos."""
+    ponytail: smallest-first so a prompt module beats a bundle; raise `limit` for large repos.
+    Path.walk() (not rglob) so vendored dirs are pruned BEFORE descending — rglob has no pruning
+    hook and would enumerate all of node_modules just to discard it."""
     root = Path(root)
     hits: list[Path] = []
-    for path in root.rglob("*"):
-        if path.suffix not in _SUFFIXES or not path.is_file():
-            continue
-        if _SKIP_DIRS & set(path.relative_to(root).parts):
-            continue
-        try:
-            if _MARKER.search(path.read_text(encoding="utf-8", errors="replace")[:_MAX_CHARS]):
-                hits.append(path)
-        except OSError:
-            continue
+    for dirpath, dirnames, filenames in root.walk():
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        for name in filenames:
+            path = dirpath / name
+            if path.suffix not in _SUFFIXES:
+                continue
+            try:
+                if _MARKER.search(path.read_text(encoding="utf-8", errors="replace")[:_MAX_CHARS]):
+                    hits.append(path)
+            except OSError:
+                continue
     return sorted(hits, key=lambda p: p.stat().st_size)[:limit]
 
 
