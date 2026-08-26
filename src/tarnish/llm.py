@@ -25,7 +25,7 @@ def text_of(response) -> str:
     if isinstance(content, str):
         return content
     if isinstance(content, list):
-        parts = [b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"]
+        parts = [b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"]
         if parts:
             return "".join(parts)
     return str(content)
