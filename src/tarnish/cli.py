@@ -10,7 +10,9 @@ from langfuse import observe
 
 from . import recon
 from .authz import assert_authorized
+from .baseline import load_baseline
 from .campaign import run_campaign
+from .checkr import exit_code, run_check
 from .config import load_target
 from .cv import BENIGN_CV
 from .langfuse_setup import get_langfuse, tracing_enabled
@@ -102,6 +104,38 @@ def explore(
     if report:
         typer.echo(f"Report: {render_to_file(result, json_path.with_suffix('.html'))}")
     _tracing_hint()
+
+
+@app.command()
+def check(root: Path = typer.Argument(Path("."), help="The repo to check.")):
+    """Replay the payloads `explore` proved. Deterministic verdict, CI exit code, no LLM campaign."""
+    profile = recon.load_profile(root)
+    baseline = load_baseline(root, profile.id)
+    if not baseline.proofs:
+        typer.echo("Nothing to replay. Run `tarnish explore` first.")
+        raise typer.Exit(0)
+
+    try:
+        rows = run_check(profile, baseline)
+    except ValueError as e:
+        # A stored proof can name a surface kind the profile no longer has (the repo was
+        # reorganized and re-`init`ed). Not a verdict about the target — an unverifiable gate,
+        # reported and failed, never a traceback.
+        typer.echo(f"Baseline is stale: {e}")
+        typer.echo("Run `tarnish explore` to rebuild it against the current profile.")
+        raise typer.Exit(1) from None
+
+    for row in rows:
+        typer.echo(f"  [{row.severity}] {row.objective} {row.fingerprint} — {row.status}")
+        typer.echo(f"      {row.evidence[:160]}")
+    code = exit_code(rows)
+    typer.echo(
+        f"{sum(r.status in ('open', 'regression') for r in rows)} reproducing / {len(rows)} checked"
+        + ("" if code else " — clean")
+    )
+    if code:
+        typer.echo("Run `tarnish check --fix` to apply and verify the mitigation.  [M3]")
+    raise typer.Exit(code)
 
 
 @app.command()
