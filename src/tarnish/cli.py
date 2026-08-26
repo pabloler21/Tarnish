@@ -8,6 +8,7 @@ from pathlib import Path
 import typer
 from langfuse import observe
 
+from . import recon
 from .authz import assert_authorized
 from .campaign import run_campaign
 from .config import load_target
@@ -58,6 +59,21 @@ def gate0(
 
     typer.echo(f"Benign request delivered to '{profile.id}'. Response preview:")
     typer.echo(response[:1000])
+    _tracing_hint()
+
+
+@app.command()
+def init(root: Path = typer.Argument(Path("."), help="The repo to profile.")):
+    """Read the repo and write .tarnish/profile.json: surfaces, system prompt, tool inventory."""
+    profile = recon.profile_repo(root)
+    path = recon.write_profile(profile)
+    typer.echo(f"{profile.name}: {profile.language}, {len(profile.surfaces)} surface(s), "
+               f"{len(profile.tools)} tool(s)")
+    for s in profile.surfaces:
+        typer.echo(f"  {s.kind:16} {s.file}:{s.line} ({s.symbol})")
+    for t in profile.tools:
+        typer.echo(f"  tool             {t.name}{'  [side effect]' if t.side_effect else ''}")
+    typer.echo(f"Profile: {path}")
     _tracing_hint()
 
 
