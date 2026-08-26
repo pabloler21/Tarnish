@@ -55,3 +55,48 @@ def test_fixed_finding_is_rehydrated_and_rescan_verified(tmp_path):
     assert len(fixed) == 1
     v = fixed[0].remediation.verification
     assert v is not None and v.mode == "rescan" and v.status == "verified"
+
+
+"""`.tarnish/baseline.json`: the proofs `check` replays, plus suppressions only ever set
+deliberately. A fresh finding must NOT be auto-accepted or the gate is decorative."""
+
+
+def test_write_baseline_records_proofs_but_accepts_nothing(tmp_path):
+    from tarnish.baseline import load_baseline, write_baseline
+    from tarnish.schemas import CampaignResult, TargetProfile
+
+    result = CampaignResult(
+        target=TargetProfile(id="victim", name="victim", url="https://x", owner_verified=True),
+        findings=[_finding("aa11")],
+    )
+    path = write_baseline(result, tmp_path)
+
+    assert path == tmp_path / ".tarnish" / "baseline.json"
+    baseline = load_baseline(tmp_path, "victim")
+    assert "aa11" in baseline.proofs
+    assert baseline.fingerprints == {}, "a new finding is open, not accepted"
+
+
+def test_write_baseline_marks_fixed_and_keeps_existing_suppressions(tmp_path):
+    from tarnish.baseline import load_baseline, write_baseline
+    from tarnish.schemas import Baseline, CampaignResult, TargetProfile
+
+    existing = Baseline(target_id="victim", fingerprints={"bb22": "accepted"})
+    (tmp_path / ".tarnish").mkdir()
+    (tmp_path / ".tarnish" / "baseline.json").write_text(existing.model_dump_json())
+
+    result = CampaignResult(
+        target=TargetProfile(id="victim", name="victim", url="https://x", owner_verified=True),
+        findings=[_finding("aa11")], fixed_findings=["cc33"],
+    )
+    write_baseline(result, tmp_path)
+
+    baseline = load_baseline(tmp_path, "victim")
+    assert baseline.fingerprints == {"bb22": "accepted", "cc33": "fixed"}
+
+
+def test_load_baseline_on_a_fresh_repo_is_empty(tmp_path):
+    from tarnish.baseline import load_baseline
+
+    baseline = load_baseline(tmp_path, "victim")
+    assert baseline.target_id == "victim" and baseline.proofs == {}

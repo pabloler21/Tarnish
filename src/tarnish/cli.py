@@ -78,22 +78,28 @@ def init(root: Path = typer.Argument(Path("."), help="The repo to profile.")):
 
 
 @app.command()
-def run(
-    target: str = typer.Option("aurea", help="Target profile id (targets/<id>.yaml)."),
-    headless: bool = typer.Option(True, help="Run the browser headless."),
+def explore(
+    root: Path = typer.Option(Path("."), help="Repo to attack (harness mode, the default)."),
+    live: str = typer.Option("", help="Attack a running target instead: targets/<id>.yaml."),
+    headless: bool = typer.Option(True, help="Browser headless (--live only)."),
     max_tasks: int = typer.Option(0, help="Cap the number of attack tasks (0 = all)."),
     report: bool = typer.Option(True, help="Also render the HTML report next to the JSON."),
 ):
-    """Run a full campaign: control + attacks -> evaluate -> remediate -> JSON + HTML report."""
+    """The full campaign: 3 RAG specialists -> evaluate vs control -> remediate -> report.
+    Harness mode reconstructs the target from .tarnish/profile.json; --live drives the browser."""
     get_langfuse()  # configure env + init the client BEFORE run_campaign's @observe span opens
-    result, json_path = run_campaign(target, headless=headless, max_tasks=max_tasks or None)
+    target = load_target(live) if live else recon.load_profile(root)
+    result, json_path = run_campaign(
+        target, mode="live" if live else "harness",
+        headless=headless, max_tasks=max_tasks or None,
+    )
 
     typer.echo(f"Campaign complete. {len(result.findings)} finding(s). JSON: {json_path}")
     for f in result.findings:
-        typer.echo(f"  [{f.severity}] {f.objective} via {f.reproduction.payload.technique} ({f.status})")
+        typer.echo(f"  [{f.severity}] {f.objective} via {f.reproduction.payload.technique} "
+                   f"{f.location} ({f.status})")
     if report:
-        html_path = render_to_file(result, json_path.with_suffix(".html"))
-        typer.echo(f"Report: {html_path}")
+        typer.echo(f"Report: {render_to_file(result, json_path.with_suffix('.html'))}")
     _tracing_hint()
 
 

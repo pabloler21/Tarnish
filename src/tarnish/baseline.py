@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .schemas import CampaignResult, Finding, VerificationResult
+from .schemas import Baseline, CampaignResult, Finding, VerificationResult
 
 
 def diff(current: set[str], previous: set[str]) -> tuple[set[str], set[str], set[str]]:
@@ -54,3 +54,29 @@ def apply_status(result: CampaignResult, target_id: str, reports_dir: str = "rep
         )
         result.findings.append(resolved)
     return result
+
+
+def baseline_path(root: str | Path) -> Path:
+    return Path(root) / ".tarnish" / "baseline.json"
+
+
+def load_baseline(root: str | Path, target_id: str) -> Baseline:
+    path = baseline_path(root)
+    if not path.exists():
+        return Baseline(target_id=target_id)
+    return Baseline.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def write_baseline(result: CampaignResult, root: str | Path) -> Path:
+    """Merge this run into the committed gate file: refresh the proofs `check` replays, record
+    what got fixed, keep prior suppressions. NEVER auto-accept a finding — an accepted entry is
+    a human decision, and inventing one here would make the CI gate green forever."""
+    baseline = load_baseline(root, result.target.id)
+    for finding in result.findings:
+        baseline.proofs[finding.fingerprint] = finding.reproduction
+    for fingerprint_ in result.fixed_findings:
+        baseline.fingerprints[fingerprint_] = "fixed"
+    path = baseline_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(baseline.model_dump_json(indent=2), encoding="utf-8")
+    return path

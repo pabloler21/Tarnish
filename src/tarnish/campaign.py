@@ -9,12 +9,11 @@ from pathlib import Path
 from langfuse import observe
 
 from .authz import assert_authorized
-from .baseline import apply_status
+from .baseline import apply_status, write_baseline
 from .checkpointer import get_checkpointer
-from .config import load_target
 from .langfuse_setup import get_langfuse
 from .orchestrator import DEFAULT_TASKS, build_graph
-from .schemas import CampaignResult
+from .schemas import CampaignResult, RepoProfile, TargetProfile
 
 
 def _coverage(tasks: list[tuple[str, str]], findings) -> dict:
@@ -35,14 +34,14 @@ def _persist(result: CampaignResult, reports_dir: str = "reports") -> Path:
 
 @observe(name="campaign")
 def run_campaign(
-    target_id: str = "aurea",
+    target: TargetProfile | RepoProfile,
     *,
+    mode: str = "live",
     tasks: list[tuple[str, str]] | None = None,
     headless: bool = True,
     max_tasks: int | None = None,
 ) -> tuple[CampaignResult, Path]:
     get_langfuse()  # init before any @observe span
-    target = load_target(target_id)
     assert_authorized(target)
 
     tasks = list(tasks or DEFAULT_TASKS)
@@ -50,9 +49,9 @@ def run_campaign(
         tasks = tasks[:max_tasks]
 
     graph = build_graph(get_checkpointer())
-    thread = f"{target_id}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%S')}"
+    thread = f"{target.id}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%S')}"
     final = graph.invoke(
-        {"target": target, "tasks": tasks, "headless": headless},
+        {"target": target, "tasks": tasks, "headless": headless, "mode": mode},
         {"configurable": {"thread_id": thread}},
     )
 
@@ -63,7 +62,9 @@ def run_campaign(
         control_baseline=final.get("control_response", ""),
         coverage=_coverage(tasks, findings),
     )
-    result = apply_status(result, target_id)
+    result = apply_status(result, target.id)
     path = _persist(result)
+    if mode == "harness":  # the committed gate file lives in the user's repo, not ours
+        write_baseline(result, target.root)
     get_langfuse().flush()
     return result, path
