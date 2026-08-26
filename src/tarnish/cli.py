@@ -96,8 +96,9 @@ def explore(
 
     typer.echo(f"Campaign complete. {len(result.findings)} finding(s). JSON: {json_path}")
     for f in result.findings:
-        typer.echo(f"  [{f.severity}] {f.objective} via {f.reproduction.payload.technique} "
-                   f"{f.location} ({f.status})")
+        location = f" {f.location}" if f.location else ""
+        typer.echo(f"  [{f.severity}] {f.objective} via {f.reproduction.payload.technique}"
+                   f"{location} ({f.status})")
     if report:
         typer.echo(f"Report: {render_to_file(result, json_path.with_suffix('.html'))}")
     _tracing_hint()

@@ -64,7 +64,12 @@ def load_baseline(root: str | Path, target_id: str) -> Baseline:
     path = baseline_path(root)
     if not path.exists():
         return Baseline(target_id=target_id)
-    return Baseline.model_validate_json(path.read_text(encoding="utf-8"))
+    try:
+        return Baseline.model_validate_json(path.read_text(encoding="utf-8"))
+    except ValueError as e:  # malformed JSON or a schema mismatch (both subclass ValueError)
+        raise RuntimeError(
+            f"{path} is unreadable — corrupt, or holding unresolved merge conflict markers: {e}"
+        ) from e
 
 
 def write_baseline(result: CampaignResult, root: str | Path) -> Path:

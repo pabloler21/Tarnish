@@ -100,3 +100,45 @@ def test_load_baseline_on_a_fresh_repo_is_empty(tmp_path):
 
     baseline = load_baseline(tmp_path, "victim")
     assert baseline.target_id == "victim" and baseline.proofs == {}
+
+
+def test_load_baseline_raises_actionable_error_on_corrupt_file(tmp_path):
+    """baseline.json is committed by design, so an unresolved git merge conflict is the expected
+    corruption mode, not an exotic one. The bare parse error must not leak past this loader."""
+    from tarnish.baseline import load_baseline
+
+    (tmp_path / ".tarnish").mkdir()
+    conflicted = tmp_path / ".tarnish" / "baseline.json"
+    conflicted.write_text(
+        "<<<<<<< HEAD\n{\"target_id\": \"victim\"}\n=======\n{\"target_id\": \"other\"}\n"
+        ">>>>>>> branch\n",
+        encoding="utf-8",
+    )
+
+    try:
+        load_baseline(tmp_path, "victim")
+        assert False, "expected a RuntimeError"
+    except RuntimeError as e:
+        assert str(conflicted) in str(e)
+
+
+def test_write_baseline_keeps_prior_accepted_when_the_finding_reproduces_again(tmp_path):
+    """The single most important property of this task: a fingerprint already marked `accepted`
+    must survive a run that reproves it, and its proof must still refresh."""
+    from tarnish.baseline import load_baseline, write_baseline
+    from tarnish.schemas import Baseline, CampaignResult, TargetProfile
+
+    existing = Baseline(target_id="victim", fingerprints={"aa11": "accepted"})
+    (tmp_path / ".tarnish").mkdir()
+    (tmp_path / ".tarnish" / "baseline.json").write_text(existing.model_dump_json())
+
+    finding = _finding("aa11")
+    result = CampaignResult(
+        target=TargetProfile(id="victim", name="victim", url="https://x", owner_verified=True),
+        findings=[finding],
+    )
+    write_baseline(result, tmp_path)
+
+    baseline = load_baseline(tmp_path, "victim")
+    assert baseline.fingerprints["aa11"] == "accepted"
+    assert baseline.proofs["aa11"] == finding.reproduction
