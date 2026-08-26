@@ -19,11 +19,35 @@ def test_candidate_files_finds_the_victim_sources():
     assert not any(f.endswith(".json") for f in files)
 
 
+def test_candidate_files_finds_the_one_hop_ingest_surface():
+    # ingest.ts never mentions an LLM/prompt/tool marker directly — it only funnels untrusted
+    # text through handleMessage() in bot.ts. That import is the whole attack surface.
+    files = [p.as_posix() for p in recon.candidate_files("victim")]
+    assert any(f.endswith("src/ingest.ts") for f in files)
+
+
+def test_candidate_files_hop_is_one_level_only(tmp_path):
+    (tmp_path / "llm.ts").write_text('import OpenAI from "openai";')
+    (tmp_path / "wrapper.ts").write_text('import { chat } from "./llm";\nexport const wrap = chat;')
+    (tmp_path / "caller.ts").write_text('import { wrap } from "./wrapper";\nexport const call = wrap;')
+    names = {p.name for p in recon.candidate_files(tmp_path)}
+    assert "llm.ts" in names
+    assert "wrapper.ts" in names, "one hop from a direct hit must be included"
+    assert "caller.ts" not in names, "two hops from a direct hit must NOT be included"
+
+
 def test_candidate_files_skips_vendored_directories(tmp_path):
     (tmp_path / "node_modules" / "pkg").mkdir(parents=True)
     (tmp_path / "node_modules" / "pkg" / "index.ts").write_text("const systemPrompt = 1")
     (tmp_path / "app.ts").write_text("const SYSTEM_PROMPT = 'you are a bot'")
     assert [p.name for p in recon.candidate_files(tmp_path)] == ["app.ts"]
+
+
+def test_candidate_files_hop_does_not_reach_into_vendored_directories(tmp_path):
+    (tmp_path / "node_modules" / "pkg").mkdir(parents=True)
+    (tmp_path / "node_modules" / "pkg" / "index.ts").write_text('import OpenAI from "openai";')
+    (tmp_path / "app.ts").write_text('import { index } from "./node_modules/pkg/index";')
+    assert [p.name for p in recon.candidate_files(tmp_path)] == []
 
 
 class _FakeModel:

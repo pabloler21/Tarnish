@@ -23,6 +23,23 @@ _MARKER = re.compile(
     re.I,
 )
 _MAX_CHARS = 8000  # per file; a prompt module is small, a bundle is not worth reading
+_Q = r"""['"]"""  # a single or double quote, without escaping headaches in an f-string
+
+
+def _imports(text: str, stem: str) -> bool:
+    """Does `text` import a module named `stem`? No module resolver — a file that mentions the
+    stem in an import/require statement counts. JS/TS: a quoted path ending in the stem
+    (`./bot`, `../bot`, `bot`). Python: `from .bot import ...` / `from pkg.bot import ...` /
+    a bare `import bot`. False positives are possible on a generic stem shared by two unrelated
+    modules; the direct marker match stays the primary signal, this is only the one-hop extra."""
+    s = re.escape(stem)
+    pattern = (
+        rf"from\s+{_Q}[./\w-]*\b{s}\b{_Q}"                     # JS: from './bot'
+        rf"|(?:import|require)\(\s*{_Q}[./\w-]*\b{s}\b{_Q}"    # JS: import()/require('./bot')
+        rf"|from\s+[.\w]*\b{s}\b\s+import"                     # py: from .bot import
+        rf"|^\s*import\s+[.\w]*\b{s}\b\s*;?\s*$"               # py: import bot
+    )
+    return bool(re.search(pattern, text, re.M))
 
 _SYSTEM = (
     "You are a code auditor mapping an LLM application's attack surface. You are given real "
@@ -40,12 +57,19 @@ _SYSTEM = (
 
 
 def candidate_files(root: str | Path, limit: int = 12) -> list[Path]:
-    """The files worth showing the model: source, not vendored, mentioning an LLM/prompt/tool.
+    """The files worth showing the model: source, not vendored, mentioning an LLM/prompt/tool
+    — plus one import hop. A file that only imports a direct hit (e.g. `ingest.ts` funnels
+    untrusted text through `bot.ts` without mentioning a model itself) is still an attack
+    surface; that's the whole reason `init` exists instead of grepping for "openai" yourself.
+    Deliberately one hop, not a transitive import graph — a real resolver is overkill for
+    "does this file feed into something we already flagged", and a graph invites a slow crawl
+    of an entire repo's import tree for marginal recall.
     ponytail: smallest-first so a prompt module beats a bundle; raise `limit` for large repos.
     Path.walk() (not rglob) so vendored dirs are pruned BEFORE descending — rglob has no pruning
     hook and would enumerate all of node_modules just to discard it."""
     root = Path(root)
-    hits: list[Path] = []
+    direct: list[Path] = []
+    others: list[tuple[Path, str]] = []
     for dirpath, dirnames, filenames in root.walk():
         dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
         for name in filenames:
@@ -53,11 +77,21 @@ def candidate_files(root: str | Path, limit: int = 12) -> list[Path]:
             if path.suffix not in _SUFFIXES:
                 continue
             try:
-                if _MARKER.search(path.read_text(encoding="utf-8", errors="replace")[:_MAX_CHARS]):
-                    hits.append(path)
+                text = path.read_text(encoding="utf-8", errors="replace")[:_MAX_CHARS]
             except OSError:
                 continue
-    return sorted(hits, key=lambda p: p.stat().st_size)[:limit]
+            if _MARKER.search(text):
+                direct.append(path)
+            else:
+                others.append((path, text))
+
+    stems = {p.stem for p in direct}
+    hop = [path for path, text in others if any(_imports(text, stem) for stem in stems)]
+
+    # Direct hits win the cap: a file that actually calls the model outranks one that merely
+    # imports it.
+    ranked = sorted(direct, key=lambda p: p.stat().st_size) + sorted(hop, key=lambda p: p.stat().st_size)
+    return ranked[:limit]
 
 
 def _context(root: Path, files: list[Path]) -> str:
