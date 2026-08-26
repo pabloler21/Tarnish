@@ -69,3 +69,31 @@ def test_report_renders_empty():
         target=TargetProfile(id="aurea", name="Aurea", url="https://x", owner_verified=True),
     )
     assert "No findings" in render_html(result)
+
+
+def test_report_renders_a_repo_mode_campaign():
+    """A RepoProfile target has no url; the header and the finding location must still render."""
+    from tarnish.schemas import (
+        PromptRef, RepoProfile, Surface,
+    )
+
+    profile = RepoProfile(
+        id="victim", name="victim", root="/repo/victim", language="typescript",
+        surfaces=[Surface(file="src/bot.ts", line=18, symbol="handleMessage", kind="chat_input")],
+        system_prompt=PromptRef(file="src/bot.ts", line=7, text="You are Acme Support."),
+    )
+    finding = Finding(
+        fingerprint="aa11", severity="critical", objective="data",
+        business_impact="An attacker can feed victim fabricated content.",
+        location="src/bot.ts#handleMessage",
+        reproduction=AttackAttempt(
+            id="a", surface="chat_input", raw_response="Confirmed TRN-9f3a2c.",
+            payload=Payload(objective="data", technique="injection", content="p",
+                            oracle=["TRN-9f3a2c"])),
+        control_diff="before || after",
+        remediation=Remediation(remediation_class="input_sanitization", detail="d", tier="static"),
+    )
+
+    html = render_html(CampaignResult(target=profile, findings=[finding]))
+    assert "victim" in html and "/repo/victim" in html
+    assert "src/bot.ts#handleMessage" in html

@@ -37,7 +37,7 @@
 </head>
 <body>
   <h1>Tarnish security report</h1>
-  <p class="sub">Target: <b>{{ r.target.name }}</b> — {{ r.target.url }}<br>
+  <p class="sub">Target: <b>{{ r.target.name }}</b> — {{ r.target.url or r.target.root }}<br>
      Generated {{ r.created_at.strftime("%Y-%m-%d %H:%M UTC") }}</p>
 
   <div class="summary">
@@ -49,7 +49,7 @@
 
   {% if not r.findings %}
     <h2>No findings</h2>
-    <p>No attack in this campaign changed the target's evaluation relative to the clean control.</p>
+    <p>No attack in this campaign changed the target's response relative to the clean control.</p>
   {% endif %}
 
   {% for f in r.findings %}
@@ -59,6 +59,7 @@
       &nbsp;{{ f.objective }} via {{ f.reproduction.payload.technique }}
       <span class="status">{{ f.status }} · {{ f.fingerprint }}</span>
     </header>
+    {% if f.location %}<p class="sub">Surface: <code>{{ f.location }}</code></p>{% endif %}
 
     <div class="part">
       <p class="label">1 · What's broken</p>
@@ -100,9 +101,9 @@
 
   <h2>Methodology</h2>
   <ul>
-    <li><b>Mandatory control.</b> Every campaign also submits the clean, un-injected CV. A finding
-        only holds if the evaluation changed relative to that control — the diff is shown per finding.</li>
-    <li><b>Binary, objective verdict.</b> Success = the target's evaluation reflects the injected
+    <li><b>Mandatory control.</b> Every campaign also submits the clean, un-injected input. A finding
+        only holds if the response changed relative to that control — the diff is shown per finding.</li>
+    <li><b>Binary, objective verdict.</b> Success = the target's response reflects the injected
         payload. No subjective quality scoring.</li>
     <li><b>Two-stage PDF.</b> A payload must survive the parser (surfaced) and the model (acted on).</li>
     <li><b>Judge.</b> A fixed configured model; falsifiability comes from the control, not the judge's family.</li>
