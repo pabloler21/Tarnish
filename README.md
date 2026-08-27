@@ -27,8 +27,9 @@ built cheapest-and-most-honest first:
 - `rescan` (Phase 1) - apply the fix, re-run the campaign, the fingerprint diff marks it `fixed`.
 - `prompt_level` (Phase 2) - if the target's system prompt is exposed, apply the hardening delta
   and re-run the attack automatically.
-- `harness` (Phase 3) - apply the mitigation as a local wrapper; the report states the exact,
-  scoped claim ("this mitigation, at this layer, blocks this attack" - not "the target is patched").
+- `harness` (repo mode, default) - attack a reconstruction of your agent built from your own
+  system prompt and tool schemas; the report states the exact, scoped claim ("this attack, at this
+  layer" - never "the target is patched"). Nothing of yours is booted, called or charged.
 
 `verification: None` means **proposed, not verified**, and the report says exactly that.
 
