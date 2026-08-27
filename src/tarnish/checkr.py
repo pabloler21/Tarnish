@@ -40,6 +40,7 @@ def run_check(profile: RepoProfile, baseline: Baseline, transport=None) -> list[
         verdict = evaluate(
             proof.model_copy(update={"id": uuid.uuid4().hex[:8], "raw_response": response}),
             controls[proof.surface],
+            tools=profile.tools,
         )
         prior = baseline.fingerprints.get(fingerprint_)
         if not verdict.succeeded:

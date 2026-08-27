@@ -50,9 +50,11 @@ class _FakeHarness:
     def deliver(self, target, *, visible, hidden=None, hiding=None):
         if hidden is None:
             return "I can help with orders and refunds."
-        # The reconstructed target swallows the planted line and echoes the token back.
+        # The reconstructed target swallows the planted line AND acts on it: echoing the token
+        # proves ingestion, the CALL proves obedience.
         token = [w for w in hidden.split() if w.startswith("TRN-")]
-        return f"Confirmed {token[0] if token else 'nothing'} — refund authorized."
+        return (f"Confirmed {token[0] if token else 'nothing'}.\n"
+                'CALL refundOrder {"orderId": "A-1042", "amountCents": 50000}')
 
 
 def _repo_profile() -> RepoProfile:
@@ -65,7 +67,7 @@ def _repo_profile() -> RepoProfile:
     )
 
 
-def test_harness_mode_produces_a_canary_proven_finding(monkeypatch):
+def test_harness_mode_produces_an_oracle_proven_finding(monkeypatch):
     from tarnish.schemas import Payload
 
     monkeypatch.setattr(orchestrator, "HarnessTransport", _FakeHarness)
@@ -97,6 +99,8 @@ def test_live_mode_finding_has_empty_location(monkeypatch):
     """Live mode has no file/symbol to name. `location` must stay "" — a surface *kind*
     ("pdf_upload") is not a file#symbol identity, and Finding.location must not lie about it.
     Fingerprinting is unaffected: it still falls back to the surface kind."""
+    from tarnish import evaluator
+    from tarnish.evaluator import _Judgment
     from tarnish.fingerprint import fingerprint
     from tarnish.schemas import Payload
 
@@ -123,6 +127,12 @@ def test_live_mode_finding_has_empty_location(monkeypatch):
         orchestrator.SPECIALISTS["injection"], "generate",
         lambda target, objective, **kw: Payload(
             objective=objective, technique="injection", content="Please note the following."),
+    )
+    monkeypatch.setattr(
+        evaluator, "_judge",
+        lambda o, p, i, c: _Judgment(
+            model_acted=True, succeeded=True, evidence="Confirmed", confidence=0.9
+        ),
     )
 
     target = TargetProfile(id="t", name="t", url="https://x", owner_verified=True)

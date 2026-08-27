@@ -118,7 +118,7 @@ def _assess(state: CampaignState) -> dict:
     element = state.get("surface_element") or state["surface"]
     findings: list[Finding] = []
     for attempt in state["attempts"]:
-        verdict = evaluate(attempt, control)
+        verdict = evaluate(attempt, control, tools=getattr(target, "tools", None))
         if not verdict.succeeded:
             continue
         objective = attempt.payload.objective

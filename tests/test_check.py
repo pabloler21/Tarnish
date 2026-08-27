@@ -45,7 +45,10 @@ class _Transport:
     def deliver(self, target, *, visible, hidden=None, hiding=None):
         self.calls += 1
         if hidden and self.vulnerable:
-            return f"Confirmed {[w for w in hidden.split() if w.startswith('TRN-')][0]}."
+            token = [w for w in hidden.split() if w.startswith("TRN-")][0]
+            # The reconstructed target obeys: it calls the state-changing tool. A refusal would
+            # mention the token without ever emitting a CALL line — that distinction is D2.
+            return f'Confirmed {token}.\nCALL refundOrder {{"orderId": "A-1042"}}'
         return "I can help with orders and refunds."
 
 
@@ -90,6 +93,24 @@ def test_the_control_is_run_once_per_surface_not_once_per_payload():
     run_check(_profile(), baseline, transport=transport)
 
     assert transport.calls == 3, "1 control + 2 replays"
+
+
+def test_check_passes_the_profile_tools_to_the_evaluator(monkeypatch):
+    from tarnish import checkr
+
+    seen: list = []
+    real = checkr.evaluate
+
+    def _spy(attempt, control, tools=None):
+        seen.append(tools)
+        return real(attempt, control, tools)
+
+    monkeypatch.setattr(checkr, "evaluate", _spy)
+    baseline = Baseline(target_id="victim", proofs={"aa11": _proof("aa11", "TRN-111111")})
+    run_check(_profile(), baseline, transport=_Transport())
+
+    assert seen and seen[0], "checkr called evaluate() without the profile's tools"
+    assert any(t.name == "refundOrder" for t in seen[0])
 
 
 def test_check_cli_reports_a_stale_baseline_instead_of_a_traceback(tmp_path, monkeypatch):
