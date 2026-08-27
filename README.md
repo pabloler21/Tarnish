@@ -46,11 +46,35 @@ Tarnish drives a headless browser to attack web targets through their real input
 surface (a PDF dropzone, a chat box), so any "drop your CV" page works with no
 per-target API wiring.
 
-## Running a campaign
+## Running it
+
+Point Tarnish at your own repo. It reads the code, attacks a reconstruction of your agent, and
+tells you what reproduces — without booting your app, calling your provider, or touching a file
+outside `.tarnish/`.
 
 ```bash
-uv run tarnish run --target aurea         # control + attacks -> evaluate -> remediate -> report
-uv run tarnish gate0 --target aurea       # one benign request only, no attacks
+uv run tarnish init .          # read the repo -> .tarnish/profile.json (surfaces, prompt, tools)
+uv run tarnish explore         # the campaign: 3 RAG specialists -> verdict vs control -> report
+uv run tarnish check           # replay what explore proved. Deterministic verdict, CI exit code.
+```
+
+`explore` is the fuzzer; `check` is the regression suite. `explore` is expensive and
+non-deterministic — it *discovers*. `check` replays what it found, cheaply, forever, and breaks
+the build when a closed hole reopens.
+
+`init` writes `.tarnish/profile.json`; `explore` writes `.tarnish/baseline.json`. **Commit both** —
+they are the gate. `.tarnish/chroma/` and `.tarnish/checkpoints.sqlite` are scratch, and `init`
+writes the `.gitignore` for them itself.
+
+### The stronger claim: `--live`
+
+Repo mode attacks a *reconstruction* of your agent, so its claim is scoped: "this attack, at this
+layer". To attack the running app through its real input surface instead — a PDF dropzone, a chat
+box — drive it with the browser transport:
+
+```bash
+uv run tarnish explore --live aurea    # Playwright against the deployed target in targets/aurea.yaml
+uv run tarnish gate0 --target aurea    # one benign request only, no attacks
 ```
 
 Findings land in `reports/<target>-<timestamp>.json` with an HTML report beside them.
