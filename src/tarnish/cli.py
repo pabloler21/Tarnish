@@ -16,6 +16,7 @@ from .checkr import exit_code, run_check
 from .config import load_target
 from .cv import BENIGN_CV
 from .langfuse_setup import get_langfuse, tracing_enabled
+from .llm import harness_has_privilege_gap
 from .reporting.render import render_to_file
 from .schemas import CampaignResult
 from .transport.browser import BrowserTransport
@@ -91,6 +92,12 @@ def explore(
     Harness mode reconstructs the target from .tarnish/profile.json; --live drives the browser."""
     get_langfuse()  # configure env + init the client BEFORE run_campaign's @observe span opens
     target = load_target(live) if live else recon.load_profile(root)
+    if not live and not harness_has_privilege_gap():
+        typer.echo(
+            "Note: this backend has no system-prompt channel, so the harness runs your prompt "
+            "at the same privilege as the payload. There is no hierarchy for an injection to "
+            "cross, and findings will over-report. Use claude or an API key, or --live."
+        )
     result, json_path = run_campaign(
         target, mode="live" if live else "harness",
         headless=headless, max_tasks=max_tasks or None,
