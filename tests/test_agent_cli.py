@@ -113,3 +113,49 @@ def test_explicit_timeout_overrides_settings(monkeypatch):
         assert AgentCliChatModel(argv=["fake-cli"], timeout=5).timeout == 5
     finally:
         get_settings.cache_clear()
+
+
+def test_system_message_travels_by_flag_not_stdin(monkeypatch):
+    """D1: `claude -p` reads stdin as user text. A system prompt delivered there creates no
+    privilege boundary, so an injection has nothing to cross."""
+    calls: list = []
+    monkeypatch.setattr(subprocess, "run", _fake_run("ok", calls=calls))
+
+    AgentCliChatModel(argv=["claude", "-p"], system_flag="--system-prompt").invoke(
+        [("system", "You are Acme Support."), ("human", "Ticket #1042: my order is late.")]
+    )
+
+    (argv,), kwargs = calls[0]
+    assert "--system-prompt" in argv
+    assert argv[argv.index("--system-prompt") + 1] == "You are Acme Support."
+    # The untrusted turn reaches the target verbatim: no role prefix, no system prompt.
+    assert kwargs["input"] == "Ticket #1042: my order is late."
+    assert "SYSTEM:" not in kwargs["input"]
+    assert "Acme Support" not in kwargs["input"]
+
+
+def test_without_a_system_flag_the_blob_is_unchanged(monkeypatch):
+    """codex has no system-prompt channel; that path must keep working exactly as before."""
+    calls: list = []
+    monkeypatch.setattr(subprocess, "run", _fake_run("ok", calls=calls))
+
+    AgentCliChatModel(argv=["codex", "exec"]).invoke(
+        [("system", "You are Acme Support."), ("human", "hola")]
+    )
+
+    (argv,), kwargs = calls[0]
+    assert "--system-prompt" not in argv
+    assert kwargs["input"] == "SYSTEM: You are Acme Support.\n\nHUMAN: hola"
+
+
+def test_multiple_system_messages_are_joined_into_one_flag(monkeypatch):
+    calls: list = []
+    monkeypatch.setattr(subprocess, "run", _fake_run("ok", calls=calls))
+
+    AgentCliChatModel(argv=["claude", "-p"], system_flag="--system-prompt").invoke(
+        [("system", "A."), ("system", "B."), ("human", "q")]
+    )
+
+    (argv,), kwargs = calls[0]
+    assert argv[argv.index("--system-prompt") + 1] == "A.\n\nB."
+    assert kwargs["input"] == "q"
