@@ -133,7 +133,8 @@ def check(root: Path = typer.Argument(Path("."), help="The repo to check.")):
         raise typer.Exit(1) from None
 
     for row in rows:
-        typer.echo(f"  [{row.severity}] {row.objective} {row.fingerprint} — {row.status}")
+        typer.echo(f"  [{row.severity}] {row.objective} {row.fingerprint} — {row.status}"
+                   f"  ({row.instrument})")
         typer.echo(f"      {row.evidence[:160]}")
     code = exit_code(rows)
     typer.echo(

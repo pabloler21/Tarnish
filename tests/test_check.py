@@ -138,3 +138,20 @@ def test_check_cli_reports_a_stale_baseline_instead_of_a_traceback(tmp_path, mon
 
     assert result.exit_code != 0
     assert "tarnish explore" in result.output
+
+
+def test_check_names_the_instrument_that_decided_each_row():
+    """Deterministic when an oracle decides, not when the judge does. The row says which."""
+    baseline = Baseline(target_id="victim", proofs={"aa11": _proof("aa11", "TRN-111111")})
+    rows = run_check(_profile(), baseline, transport=_Transport())
+
+    assert rows[0].instrument == "oracle:tool-call"
+
+
+def test_a_payload_that_no_longer_reproduces_is_named_by_its_oracle_too():
+    """A `fixed` row is still a verdict and still names what produced it."""
+    baseline = Baseline(target_id="victim", proofs={"aa11": _proof("aa11", "TRN-111111")})
+    rows = run_check(_profile(), baseline, transport=_Transport(vulnerable=False))
+
+    assert rows[0].status == "fixed"
+    assert rows[0].instrument == "oracle:canary"

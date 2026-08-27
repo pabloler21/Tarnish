@@ -26,6 +26,10 @@ class CheckRow(BaseModel):
     severity: str
     status: Status
     evidence: str
+    # Which instrument decided: "oracle:tool-call" and "oracle:canary" are deterministic, a
+    # model id means the LLM judge ran. The gate says so rather than claiming a blanket
+    # determinism it cannot deliver.
+    instrument: str = ""
 
 
 def run_check(profile: RepoProfile, baseline: Baseline, transport=None) -> list[CheckRow]:
@@ -52,7 +56,7 @@ def run_check(profile: RepoProfile, baseline: Baseline, transport=None) -> list[
         rows.append(CheckRow(
             fingerprint=fingerprint_, objective=proof.payload.objective,
             severity=severity_for(proof.payload.objective, profile),  # same rule `explore` used
-            status=status, evidence=verdict.evidence,
+            status=status, evidence=verdict.evidence, instrument=verdict.judge_model,
         ))
     return rows
 
