@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from ..llm import get_chat_model, text_of
+from ..llm import get_target_model, text_of
 from ..schemas import RepoProfile, Surface
 
 # A benign, domain-plausible input per surface kind — the mandatory control.
@@ -67,7 +67,7 @@ class HarnessTransport:
         """`hiding` is accepted and ignored: hiding techniques are a PDF-rendering concern. In a
         harness the payload is simply the untrusted text that reaches the surface."""
         content = f"{visible}\n{hidden}" if hidden else visible
-        response = get_chat_model(temperature=0).invoke(
+        response = get_target_model().invoke(
             [("system", self._system()), ("human", content)]
         )
         return text_of(response)
