@@ -155,3 +155,39 @@ def test_a_payload_that_no_longer_reproduces_is_named_by_its_oracle_too():
 
     assert rows[0].status == "fixed"
     assert rows[0].instrument == "oracle:canary"
+
+
+class _JudgeOnlyTransport(_Transport):
+    """Surfaces the canary token (ingestion, proven) but never emits a CALL line, so neither
+    oracle can decide obedience and the verdict must fall through to the LLM judge."""
+
+    def deliver(self, target, *, visible, hidden=None, hiding=None):
+        self.calls += 1
+        if hidden:
+            token = [w for w in hidden.split() if w.startswith("TRN-")][0]
+            return f"Sure, {token} noted."
+        return "I can help with orders and refunds."
+
+
+def test_check_names_the_judge_not_a_status_derived_label(monkeypatch):
+    """Both instrument tests above cover only the two oracle paths, and in that fixture `status`
+    and `instrument` correlate 1:1 - an implementation deriving `instrument` from `row.status`
+    instead of `verdict.judge_model` would pass both. Force the judge branch and assert the row
+    names the judge's model id, not an `oracle:` string, closing that hole - and proving no
+    fixture here reaches a real judge."""
+    from tarnish import evaluator
+    from tarnish.evaluator import _Judgment
+
+    monkeypatch.setattr(
+        evaluator, "_judge",
+        lambda o, p, i, c: _Judgment(
+            model_acted=True, succeeded=True, evidence="obeyed", confidence=0.9
+        ),
+    )
+
+    baseline = Baseline(target_id="victim", proofs={"aa11": _proof("aa11", "TRN-111111")})
+    rows = run_check(_profile(), baseline, transport=_JudgeOnlyTransport())
+
+    assert rows[0].status == "open"
+    assert rows[0].instrument == evaluator._judge_label()
+    assert not rows[0].instrument.startswith("oracle:")
