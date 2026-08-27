@@ -44,7 +44,10 @@ def _profile() -> RepoProfile:
 
 def _patched(monkeypatch) -> _Recorder:
     recorder = _Recorder()
-    monkeypatch.setattr(harness, "get_target_model", lambda: recorder, raising=False)
+    # No raising=False: get_target_model is a real name in harness's namespace (imported at
+    # module level). If it's ever renamed again, this must fail loudly instead of silently
+    # falling through to the real one and shelling out to a live model.
+    monkeypatch.setattr(harness, "get_target_model", lambda: recorder)
     return recorder
 
 
@@ -61,7 +64,9 @@ def test_delivery_uses_the_target_role_not_the_attacker_role(monkeypatch):
     def _attacker(*a, **k):
         raise AssertionError("the harness must not use the attacker/judge model")
 
-    monkeypatch.setattr(harness, "get_target_model", _target, raising=False)
+    monkeypatch.setattr(harness, "get_target_model", _target)
+    # raising=False stays here on purpose: harness.py never imports get_chat_model, so this name
+    # is deliberately absent from harness's namespace. Don't "fix" this to match the patch above.
     monkeypatch.setattr(harness, "get_chat_model", _attacker, raising=False)
 
     profile = _profile()
