@@ -14,7 +14,9 @@ Backend = Literal["claude_cli", "codex_cli", "openai", "anthropic"]
 
 # How to invoke each CLI backend. The prompt is appended by agent_cli.py.
 ARGV: dict[str, list[str]] = {
-    "claude_cli": ["claude", "-p"],
+    # --setting-sources "": do not load user or project settings, so no CLAUDE.md (ours or the
+    # user's) reaches any role. Paired with the neutral cwd in agent_cli.py.
+    "claude_cli": ["claude", "-p", "--setting-sources", ""],
     # --skip-git-repo-check: we run from a neutral temp dir (see agent_cli.py), and codex
     # refuses to start outside a git repository without it.
     "codex_cli": ["codex", "exec", "--skip-git-repo-check"],

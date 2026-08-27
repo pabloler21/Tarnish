@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # used by the claude_cli backend. Opus 5 (the CLI default) refuses red-team payload
     # generation via AUP safeguards; 4.8 does not. `haiku` is a cheaper/faster option.
     claude_model: str = "claude-opus-4-8"
+    # The model that PLAYS the target in harness mode. Chosen for resemblance to a production
+    # app, NOT for capability: a strong safety-trained model refuses injections a real
+    # gpt-4o-mini would obey, and that shows up as false negatives. VOLATILE id.
+    target_model: str = "haiku"
     anthropic_model: str = "claude-sonnet-5"  # used by the anthropic backend
     # A nested agent-CLI call carrying a RAG-assembled prompt routinely outruns a short
     # timeout; a trip kills the whole campaign, including work (e.g. the control run)

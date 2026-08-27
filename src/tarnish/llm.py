@@ -15,6 +15,38 @@ from .agent_cli import AgentCliChatModel
 from .backends import ARGV, resolve_backend
 from .config import get_settings
 
+# Which CLI backends can carry a real system prompt. Without one, the persona and the payload
+# arrive at the same privilege level and there is no hierarchy for an injection to violate —
+# so the harness biases toward false positives rather than failing safe.
+_SYSTEM_FLAG = {"claude_cli": "--system-prompt"}
+
+
+def harness_has_privilege_gap() -> bool:
+    """False when the resolved backend cannot separate system from user. The API backends can
+    (a native `system` message); claude can (`--system-prompt`); codex cannot."""
+    backend = resolve_backend()
+    return backend not in ARGV or backend in _SYSTEM_FLAG
+
+
+def get_target_model() -> BaseChatModel:
+    """The model that PLAYS the target in harness mode. Same resolved backend as every other
+    role — no second subscription — but its own model id, picked for resemblance to production
+    rather than for capability. temperature=0: the target is being measured, not created."""
+    s = get_settings()
+    backend = resolve_backend()
+    if backend in ARGV:
+        argv = list(ARGV[backend])
+        if backend == "claude_cli":
+            argv += ["--model", s.target_model, "--exclude-dynamic-system-prompt-sections"]
+        return AgentCliChatModel(
+            argv=argv, system_flag=_SYSTEM_FLAG.get(backend), temperature=0
+        )
+    if backend == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+
+        return ChatAnthropic(model=s.anthropic_model, api_key=s.anthropic_api_key, temperature=0)
+    return ChatOpenAI(model=s.llm_model, api_key=s.openai_api_key, temperature=0)
+
 
 def text_of(response) -> str:
     """Extract plain text from a chat model response. `.content` is a plain string for most
