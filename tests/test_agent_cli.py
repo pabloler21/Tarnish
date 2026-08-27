@@ -159,3 +159,18 @@ def test_multiple_system_messages_are_joined_into_one_flag(monkeypatch):
     (argv,), kwargs = calls[0]
     assert argv[argv.index("--system-prompt") + 1] == "A.\n\nB."
     assert kwargs["input"] == "q"
+
+
+def test_subprocess_runs_outside_the_project(monkeypatch):
+    """The CLI auto-discovers CLAUDE.md from its cwd. Inside our repo it answers as Tarnish's
+    own assistant instead of as the target — that is half of D1."""
+    from pathlib import Path
+
+    calls: list = []
+    monkeypatch.setattr(subprocess, "run", _fake_run("ok", calls=calls))
+    AgentCliChatModel(argv=["fake-cli"]).invoke([("human", "ping")])
+
+    cwd = calls[0][1]["cwd"]
+    assert cwd, "no cwd passed — the subprocess inherits the project directory"
+    assert Path(cwd).resolve() != Path.cwd().resolve()
+    assert not (Path(cwd) / "CLAUDE.md").exists()

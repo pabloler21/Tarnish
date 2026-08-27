@@ -15,7 +15,9 @@ Backend = Literal["claude_cli", "codex_cli", "openai", "anthropic"]
 # How to invoke each CLI backend. The prompt is appended by agent_cli.py.
 ARGV: dict[str, list[str]] = {
     "claude_cli": ["claude", "-p"],
-    "codex_cli": ["codex", "exec"],
+    # --skip-git-repo-check: we run from a neutral temp dir (see agent_cli.py), and codex
+    # refuses to start outside a git repository without it.
+    "codex_cli": ["codex", "exec", "--skip-git-repo-check"],
 }
 
 _CLI_EXECUTABLE: dict[str, str] = {"claude_cli": "claude", "codex_cli": "codex"}

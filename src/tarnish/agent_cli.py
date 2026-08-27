@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tempfile
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -66,6 +67,10 @@ class AgentCliChatModel(BaseChatModel):
             timeout=self.timeout,
             encoding="utf-8",
             errors="replace",
+            # A neutral cwd: agent CLIs auto-discover project context (CLAUDE.md, AGENTS.md)
+            # from where they run, and inside our own repo the model answers as Tarnish's
+            # assistant rather than as the target. Half of D1.
+            cwd=tempfile.gettempdir(),
         )
         if completed.returncode != 0:
             # Agent CLIs put their real message on stdout (e.g. Claude Code's AUP refusal),

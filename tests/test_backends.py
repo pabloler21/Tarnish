@@ -78,3 +78,11 @@ def test_get_chat_model_uses_anthropic_when_only_that_key_is_set(monkeypatch):
     monkeypatch.setattr(backends, "_forced_backend", lambda: "")
     monkeypatch.setattr(backends, "_api_keys", lambda: {"openai": "", "anthropic": "sk-ant-x"})
     assert type(get_chat_model()).__name__ == "ChatAnthropic"
+
+
+def test_codex_argv_allows_running_outside_a_git_repo():
+    """We run the CLI from a neutral temp dir, and codex refuses to start outside a git repo
+    without this flag."""
+    from tarnish.backends import ARGV
+
+    assert "--skip-git-repo-check" in ARGV["codex_cli"]
