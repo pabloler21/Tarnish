@@ -81,7 +81,9 @@ class Payload(BaseModel):
     content: str
     hiding: HidingTechnique | None = None  # PDF surface only
     # Canary tokens planted in `content`. If any surfaces in the target's response but NOT in the
-    # control's, the payload provably landed — a deterministic, judge-free, reproducible oracle.
+    # control's, the payload provably landed — a deterministic, reproducible oracle for
+    # INGESTION. It is not judge-free: a surfaced token still goes to the judge to decide
+    # whether the target obeyed or merely quoted it while refusing (D2).
     oracle: list[str] = Field(default_factory=list)
 
 
