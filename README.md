@@ -5,8 +5,10 @@ surface, judges each attack against ground truth, **proposes a fix for every fin
 proves the fix closes the hole**, and exports a client-facing report. Find -> fix -> verify.
 Runs on the coding-agent CLI you are already logged into: no API key, no account, no telemetry.
 
-> Working codename. Default target: **Aurea** (`bot_curriculum`), a CV-evaluation agent whose
-> only input surface is an uploaded PDF. The target is configurable (a YAML file), not hardcoded.
+> Working codename. The default target is **your own repository**: Tarnish reads it, reconstructs
+> the agent from your system prompt and tool schemas, and attacks that. `--live` drives a headless
+> browser against a deployed target instead (configured in a YAML file, never hardcoded) — that is
+> how **Aurea**, a CV-evaluation agent whose only input surface is an uploaded PDF, is exercised.
 
 See `PLAN.md` for the full architecture and phase plan, and `CLAUDE.md` for build conventions.
 
