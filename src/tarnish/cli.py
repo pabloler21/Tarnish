@@ -35,6 +35,18 @@ def _tracing_hint() -> None:
         typer.echo("tracing off — set LANGFUSE_PUBLIC_KEY/SECRET_KEY to trace this campaign")
 
 
+def _privilege_gap_hint() -> None:
+    """`explore` and `check` both run the harness through `get_target_model()`; a backend with no
+    system-prompt channel over-reports on either command, so both must say so — `check` runs
+    unattended (CI), so silence there is worse: a red build with nothing on stdout explaining why."""
+    if not harness_has_privilege_gap():
+        typer.echo(
+            "Note: this backend has no system-prompt channel, so the harness runs your prompt "
+            "at the same privilege as the payload. There is no hierarchy for an injection to "
+            "cross, and findings will over-report. Use claude or an API key, or --live."
+        )
+
+
 @observe(name="gate0-benign-request")
 def _benign_request(target, content: str, *, headless: bool = True) -> str:
     lf = get_langfuse()
@@ -92,12 +104,8 @@ def explore(
     Harness mode reconstructs the target from .tarnish/profile.json; --live drives the browser."""
     get_langfuse()  # configure env + init the client BEFORE run_campaign's @observe span opens
     target = load_target(live) if live else recon.load_profile(root)
-    if not live and not harness_has_privilege_gap():
-        typer.echo(
-            "Note: this backend has no system-prompt channel, so the harness runs your prompt "
-            "at the same privilege as the payload. There is no hierarchy for an injection to "
-            "cross, and findings will over-report. Use claude or an API key, or --live."
-        )
+    if not live:
+        _privilege_gap_hint()
     result, json_path = run_campaign(
         target, mode="live" if live else "harness",
         headless=headless, max_tasks=max_tasks or None,
@@ -122,6 +130,7 @@ def check(root: Path = typer.Argument(Path("."), help="The repo to check.")):
         typer.echo("Nothing to replay. Run `tarnish explore` first.")
         raise typer.Exit(0)
 
+    _privilege_gap_hint()
     try:
         rows = run_check(profile, baseline)
     except ValueError as e:
