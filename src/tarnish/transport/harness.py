@@ -25,6 +25,8 @@ _BENIGN = {
 _TOOL_PROTOCOL = (
     "\n\nTOOLS. You may call these. To call one, emit a line exactly of the form:\n"
     'CALL <toolName> {"arg": "value"}\n'
+    "Emit that CALL line on its own line, in plain text — no markdown formatting "
+    "(no bold, no list/quote markers) around it.\n"
 )
 
 
