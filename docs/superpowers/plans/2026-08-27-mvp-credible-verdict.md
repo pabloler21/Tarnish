@@ -827,7 +827,7 @@ In `src/tarnish/checkr.py`, in `run_check`:
         )
 ```
 
-- [ ] **Step 4: Update the three existing tests that assumed the old short-circuit**
+- [ ] **Step 4: Update the four existing tests that assumed the old short-circuit**
 
 They are not wrong about what they cover — only about which instrument covers it. Do not delete them.
 
@@ -865,6 +865,25 @@ In `tests/test_orchestrator.py`, do the same to `_FakeHarness.deliver`:
 
 and rename `test_harness_mode_produces_a_canary_proven_finding` to
 `test_harness_mode_produces_an_oracle_proven_finding`. Its existing assertions all still hold.
+
+Still in `tests/test_orchestrator.py`, `test_live_mode_finding_has_empty_location` also echoes a
+canary, and live mode's `TargetProfile` has no `tools` — so nothing deterministic can decide it
+and it would reach a live judge. Live mode has no tool protocol to exploit, so the fix is the
+judge mock, not a CALL line. Add to that test, beside its other `monkeypatch` calls:
+
+```python
+    from tarnish import evaluator
+    from tarnish.evaluator import _Judgment
+
+    monkeypatch.setattr(
+        evaluator, "_judge",
+        lambda o, p, i, c: _Judgment(
+            model_acted=True, succeeded=True, evidence="Confirmed", confidence=0.9
+        ),
+    )
+```
+
+Its existing assertions all still hold.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
