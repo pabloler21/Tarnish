@@ -17,6 +17,34 @@ def test_corpus_has_at_least_50_chunks(family):
     assert all(c.page_content.strip() for c in chunks)
 
 
+def test_build_replaces_stale_chunks_on_rebuild(tmp_path, monkeypatch):
+    """build() used to append to the persistent Chroma collection instead of replacing it, so a
+    rebuild after editing patterns.md silently left the old chunks retrievable alongside the new
+    ones (chunk count doubled to 106 instead of holding at 53). Guard the fix: building the same
+    family twice must not double the stored count."""
+    from tarnish.config import get_settings
+    import tarnish.corpora.build as cb
+
+    class _StubEmbeddings:
+        """No real model: the bug lived in Chroma's append-vs-replace behaviour, not embedding."""
+
+        def embed_documents(self, texts):
+            return [[0.0] * 8 for _ in texts]
+
+        def embed_query(self, text):
+            return [0.0] * 8
+
+    monkeypatch.setenv("CHROMA_DIR", str(tmp_path))
+    get_settings.cache_clear()
+    monkeypatch.setattr(cb, "get_embeddings", lambda: _StubEmbeddings())
+    try:
+        first = len(cb.build("injection").get()["ids"])
+        second = len(cb.build("injection").get()["ids"])
+        assert first == second == len(cb.load_chunks("injection"))
+    finally:
+        get_settings.cache_clear()
+
+
 def test_corpora_are_domain_neutral():
     """The corpus must describe attack TECHNIQUES, not CV-evaluation instances, so a payload for a
     support bot (or any target) isn't dragged toward resumes. The domain comes from the target
