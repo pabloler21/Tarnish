@@ -82,11 +82,16 @@ def test_explore_warns_when_attacker_cannot_generate_in_live_mode(tmp_path, monk
 def test_explore_names_the_billed_generation_backend_and_drops_the_warning(tmp_path, monkeypatch):
     """The negative case the two tests above cannot see: a bug echoing the cannot-generate warning
     unconditionally passes both. When generation DOES work it is on a billed API key, and the run
-    must say which backend instead of warning."""
+    must say which backend instead of warning.
+
+    The other-roles half is interpolated too, not asserted: with no agent CLI on PATH
+    `resolve_backend` falls through to the same API key, so claiming "the agent CLI" there would
+    be false for exactly the CI setup this hint exists to price."""
     target = TargetProfile(id="test", name="test", url="http://localhost:3000", owner_verified=True)
     monkeypatch.setattr("tarnish.cli.load_target", lambda profile_id: target)
     monkeypatch.setattr("tarnish.cli.attacker_can_generate", lambda: True)
     monkeypatch.setattr("tarnish.cli.resolve_attacker_backend", lambda: "openai")
+    monkeypatch.setattr("tarnish.cli.resolve_backend", lambda: "openai")  # no agent CLI on PATH
     monkeypatch.setattr(
         "tarnish.cli.run_campaign",
         lambda *a, **k: (CampaignResult(target=target, findings=[]), tmp_path / "campaign.json"),
@@ -97,3 +102,5 @@ def test_explore_names_the_billed_generation_backend_and_drops_the_warning(tmp_p
     assert result.exit_code == 0, result.output
     assert "no backend here will generate attack payloads" not in result.output
     assert "generated on `openai`, a billed API key" in result.output
+    assert "Every other role runs on `openai`." in result.output
+    assert "agent CLI." not in result.output  # the false half: nothing here runs on a CLI

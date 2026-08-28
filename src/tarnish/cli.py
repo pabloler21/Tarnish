@@ -11,7 +11,7 @@ from langfuse import observe
 
 from . import recon
 from .authz import assert_authorized
-from .backends import resolve_attacker_backend
+from .backends import resolve_attacker_backend, resolve_backend
 from .baseline import load_baseline
 from .campaign import run_campaign
 from .checkr import exit_code, run_check
@@ -111,9 +111,12 @@ def explore(
     if attacker_can_generate():
         # The honest counterpart to the warning below: generation only works because it resolved
         # to an API backend, which spends a key — on a product whose headline is "no API key".
+        # Name the OTHER roles' backend too rather than assuming a CLI: with no agent CLI on PATH
+        # `resolve_backend` falls through to the same API key and every role is billed.
         typer.echo(
             f"Note: attack payloads are generated on `{resolve_attacker_backend()}`, a billed API "
-            "key (both agent CLIs refuse to generate). Every other role runs on the agent CLI."
+            f"key (both agent CLIs refuse to generate). Every other role runs on "
+            f"`{resolve_backend()}`."
         )
     else:
         typer.echo(
