@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..corpora.build import get_retriever
-from ..llm import get_chat_model, text_of
+from ..llm import get_attacker_model, text_of
 from ..schemas import Objective, Payload
 
 _SYSTEM = (
@@ -37,5 +37,5 @@ class Specialist:
             f"Reference attack patterns:\n{context}\n\n"
             "Craft ONE concrete payload for this target and objective."
         )
-        response = get_chat_model().invoke([("system", _SYSTEM), ("human", human)])
+        response = get_attacker_model().invoke([("system", _SYSTEM), ("human", human)])
         return Payload(objective=objective, technique=self.family, content=text_of(response).strip())

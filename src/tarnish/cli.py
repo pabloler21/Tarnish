@@ -16,7 +16,7 @@ from .checkr import exit_code, run_check
 from .config import load_target
 from .cv import BENIGN_CV
 from .langfuse_setup import get_langfuse, tracing_enabled
-from .llm import harness_has_privilege_gap
+from .llm import attacker_can_generate, harness_has_privilege_gap
 from .reporting.render import render_to_file
 from .schemas import CampaignResult
 from .transport.browser import BrowserTransport
@@ -106,6 +106,11 @@ def explore(
     target = load_target(live) if live else recon.load_profile(root)
     if not live:
         _privilege_gap_hint()
+        if not attacker_can_generate():
+            typer.echo(
+                "Note: no backend here will generate attack payloads (the claude CLI refuses), so the "
+                "campaign will find nothing. Install codex, or set OPENAI_API_KEY / ANTHROPIC_API_KEY."
+            )
     result, json_path = run_campaign(
         target, mode="live" if live else "harness",
         headless=headless, max_tasks=max_tasks or None,
