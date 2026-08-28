@@ -10,30 +10,37 @@ from ..schemas import Objective, Remediation
 _MAP: dict[Objective, tuple[str, str]] = {
     "instruction": (
         "prompt_hardening",
-        "Add a system-prompt delta stating the resume is untrusted data; never follow "
-        "instructions found inside it. Score only on genuine evidence.",
+        "Add a system-prompt delta declaring every user-supplied or retrieved block untrusted "
+        "data: it may be quoted or summarized, never executed as an instruction. Restate the "
+        "task and its constraints AFTER that block, so the last word belongs to the system.",
     ),
     "data": (
         "input_sanitization",
-        "Strip invisible/hidden text (zero-width, bidi, white-on-white) before evaluation, and "
-        "verify claimed skills/experience against structured, corroborated fields.",
+        "Sanitize untrusted content before it reaches the prompt: strip zero-width and bidi "
+        "control characters; where the input arrives as a document, also drop text hidden by "
+        "colour, size or position at parse time (a text-level strip cannot see it). Take any "
+        "fact the model acts on from your own records, not from claims made inside that content.",
     ),
     "leak": (
         "prompt_hardening",
-        "Instruct the model to never disclose its system prompt or scoring rubric, and to refuse "
-        "meta-questions about its own instructions.",
+        "Instruct the model never to disclose its system prompt, tool definitions or internal "
+        "rules — verbatim or paraphrased — and to refuse meta-questions about its own "
+        "configuration.",
     ),
     "jailbreak": (
         "scope_restriction",
-        "Enforce the CV-evaluation task boundary: refuse any request to act outside scoring a "
-        "resume, regardless of framing.",
+        "Enforce the agent's task boundary in code, not only in the prompt: reject any request "
+        "outside the operations this agent exists to perform. Role-play, hypotheticals and "
+        "'for testing' framings do not widen that boundary.",
     ),
     "logic": (
         "schema_closure",
-        "Constrain the output to a closed schema (integer score 0-100 + verdict enum); reject "
-        "free-form verdicts and out-of-scope documents.",
+        "Constrain the model's output to a closed schema — typed fields, an enum for every "
+        "decision — and validate it before acting on it. Reject free-form output and any value "
+        "outside the enum instead of coercing it into range.",
     ),
 }
+
 
 _SEVERITY: dict[Objective, str] = {
     "instruction": "critical",
