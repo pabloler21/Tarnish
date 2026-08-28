@@ -106,11 +106,11 @@ def explore(
     target = load_target(live) if live else recon.load_profile(root)
     if not live:
         _privilege_gap_hint()
-        if not attacker_can_generate():
-            typer.echo(
-                "Note: no backend here will generate attack payloads (the claude CLI refuses), so the "
-                "campaign will find nothing. Install codex, or set OPENAI_API_KEY / ANTHROPIC_API_KEY."
-            )
+    if not attacker_can_generate():
+        typer.echo(
+            "Note: no backend here will generate attack payloads (the claude CLI refuses), so the "
+            "campaign will find nothing. Install codex, or set OPENAI_API_KEY / ANTHROPIC_API_KEY."
+        )
     result, json_path = run_campaign(
         target, mode="live" if live else "harness",
         headless=headless, max_tasks=max_tasks or None,
