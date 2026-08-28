@@ -10,6 +10,7 @@ from langfuse import observe
 
 from . import recon
 from .authz import assert_authorized
+from .backends import resolve_attacker_backend
 from .baseline import load_baseline
 from .campaign import run_campaign
 from .checkr import exit_code, run_check
@@ -106,7 +107,14 @@ def explore(
     target = load_target(live) if live else recon.load_profile(root)
     if not live:
         _privilege_gap_hint()
-    if not attacker_can_generate():
+    if attacker_can_generate():
+        # The honest counterpart to the warning below: generation only works because it resolved
+        # to an API backend, which spends a key — on a product whose headline is "no API key".
+        typer.echo(
+            f"Note: attack payloads are generated on `{resolve_attacker_backend()}`, a billed API "
+            "key (both agent CLIs refuse to generate). Every other role runs on the agent CLI."
+        )
+    else:
         typer.echo(
             "Note: no backend here will generate attack payloads (both the claude and codex CLIs "
             "refuse), so the campaign will find nothing. Set OPENAI_API_KEY / ANTHROPIC_API_KEY."
