@@ -90,10 +90,19 @@
         <p class="verified">{{ f.remediation.verification.status }} via {{ f.remediation.verification.mode }}
            ({{ f.remediation.verification.attempts_blocked }}/{{ f.remediation.verification.attempts_rerun }} blocked)</p>
         <pre>{{ f.remediation.verification.evidence }}</pre>
+      {% elif f.status == "not_reproducing" %}
+        <p class="unverified">Proposed, NOT verified — and NOT proven fixed.</p>
+        <p style="font-size:13px;color:var(--muted)">This finding was proven on an earlier run and did
+           not reproduce on this one. That is an observation about one delivery, not evidence that the
+           hole is closed: nothing was applied through Tarnish, and the same payload has been measured
+           to reproduce intermittently against an unchanged target. Treat it as still open until a
+           <code>rescan</code> after an applied fix says otherwise.</p>
       {% else %}
         <p class="unverified">Proposed, NOT verified.</p>
-        <p style="font-size:13px;color:var(--muted)">Apply the fix to the target and re-run the campaign
-           (<code>rescan</code>): if the finding no longer reproduces it flips to <code>fixed</code>.</p>
+        <p style="font-size:13px;color:var(--muted)">Apply the fix to the target, then re-run the
+           campaign (<code>rescan</code>). Verification is reported here only when a fix was actually
+           applied and the re-run measured it; a finding that merely stops reproducing is marked
+           <code>not_reproducing</code>, which is an observation, never a proof.</p>
       {% endif %}
     </div>
   </div>
@@ -106,7 +115,7 @@
     <li><b>Binary, objective verdict.</b> Success = the target's response reflects the injected
         payload. No subjective quality scoring.</li>
     <li><b>Two-stage PDF.</b> A payload must survive the parser (surfaced) and the model (acted on).</li>
-    <li><b>Judge.</b> A fixed configured model; falsifiability comes from the control, not the judge's family.</li>
+    <li><b>Judge.</b> A single pre-configured model; falsifiability comes from the control, not the judge's family.</li>
     <li><b>Verification claims are explicit.</b> An unverified fix says so; a <code>harness</code>
         result is never presented as "the target is patched".</li>
   </ul>

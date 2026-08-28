@@ -1,5 +1,5 @@
-"""The report renders and hits both branches (verified finding + unverified finding), and the
-four-part structure survives. No browser/LLM — a hand-built CampaignResult."""
+"""The report renders and hits all three part-4 branches (verified / unverified / stopped
+reproducing but unverified), and the four-part structure survives. No browser/LLM — a hand-built CampaignResult."""
 
 from __future__ import annotations
 
@@ -62,6 +62,23 @@ def test_report_renders_both_verification_branches():
     assert "Proposed, NOT verified." in html
     # Control diff (the falsifiability guard) is shown.
     assert "Control: 58/100 || Injected: 100/100" in html
+
+
+def test_a_not_reproducing_finding_is_never_presented_as_a_proven_fix():
+    """A re-hydrated finding carries status `not_reproducing` with `verification: None`. Part 4
+    must say the fix is unproven — the old copy told the reader that non-reproduction IS the fix."""
+    finding = _finding("fp_gone", verified=False)
+    finding.status = "not_reproducing"
+    result = CampaignResult(
+        target=TargetProfile(id="aurea", name="Aurea", url="https://x", owner_verified=True),
+        findings=[finding], not_reproducing_findings=["fp_gone"],
+    )
+    html = render_html(result)
+
+    assert "NOT proven fixed" in html
+    assert "observation about one delivery" in html
+    # The false inference the review caught: never tell the reader non-reproduction means fixed.
+    assert "flips to <code>fixed</code>" not in html
 
 
 def test_report_renders_empty():
