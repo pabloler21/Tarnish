@@ -1,8 +1,11 @@
 # Tarnish
 
 Autonomous multi-agent system that red-teams an LLM-powered target through its own input
-surface, judges each attack against ground truth, **proposes a fix for every finding and
-proves the fix closes the hole**, and exports a client-facing report. Find -> fix -> verify.
+surface, judges each attack against ground truth, **proposes a fix for every finding and, once a
+fix is applied, re-runs the attack to prove it closes the hole**, and exports a client-facing
+report. Find -> fix -> verify. Nothing is applied through Tarnish yet, so today every fix ships
+as proposed-not-verified, and the report says which it is.
+
 Runs on the coding-agent CLI you are already logged into: no account, no telemetry. One
 exception, measured 2026-08-28: *generating* the attack payloads needs an API key, because
 both the `claude` and `codex` CLIs refuse that prompt on AUP grounds. The target, judge,
@@ -70,10 +73,11 @@ uv run tarnish check           # replay what explore proved. CI exit code, instr
 
 `explore` is the fuzzer; `check` is the regression suite. `explore` is expensive and
 non-deterministic — it *discovers*. `check` replays what it found, cheaply, forever, and fails the
-build on anything that still reproduces. It is deterministic where it can be and says when it
-isn't: two oracles decide without a model, the LLM judge decides the rest, and each row names
-which one ran. It delivers each proof once, so a vulnerability that only reproduces intermittently
-can pass a run — treat a green `check` as "did not reproduce here", not as "closed".
+build on anything that reproduces and has not been marked `accepted` in `baseline.json` (an
+accepted finding still reproduces — you decided to live with it). It is deterministic where it can
+be and says when it isn't: two oracles decide without a model, the LLM judge decides the rest, and
+each row names which one ran. It delivers each proof once, so a vulnerability that only reproduces
+intermittently can pass a run — treat a green `check` as "did not reproduce here", not "closed".
 
 `init` writes `.tarnish/profile.json`; `explore` writes `.tarnish/baseline.json`. **Commit both** —
 they are the gate. `.tarnish/chroma/` and `.tarnish/checkpoints.sqlite` are scratch, and `init`
