@@ -66,6 +66,8 @@ def resolve_backend() -> Backend:
         "  1. Claude Code   install it, then `claude login` (uses your Claude plan)\n"
         "  2. Codex         install it, then `codex login` (uses your ChatGPT plan)\n"
         "  3. An API key    set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env\n"
+        "The agent CLIs cover every role EXCEPT generating attack payloads, which both refuse\n"
+        "on AUP grounds - without an API key `explore` runs but finds nothing.\n"
         "Then run this command again."
     )
 

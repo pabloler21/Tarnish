@@ -1,6 +1,10 @@
-"""The target role is not the attacker role. The attacker needs a model that will generate a
-red-team payload; the target needs one that resembles what runs in production. Serving both
-from one factory pinned the target to the most injection-resistant model we have."""
+"""Three roles, three factories. `get_chat_model()` is the GENERAL model (judge, remediation,
+recon); `get_target_model()` plays the target and needs to resemble what runs in production;
+`get_attacker_model()` generates payloads and needs a backend that will not refuse. Serving all
+three from one factory pinned the target to the most injection-resistant model we have.
+
+Tests named for the general model must not be read as attacker coverage — that mislabelling is
+why the attacker path has its own assertions at the bottom of this file."""
 
 from __future__ import annotations
 
@@ -15,12 +19,12 @@ def _claude_backend(monkeypatch):
     monkeypatch.setattr(llm, "resolve_backend", lambda: "claude_cli")
 
 
-def test_target_model_differs_from_the_attacker_model():
-    attacker = llm.get_chat_model()
+def test_target_model_differs_from_the_general_model():
+    general = llm.get_chat_model()
     target = llm.get_target_model()
 
-    assert isinstance(attacker, AgentCliChatModel) and isinstance(target, AgentCliChatModel)
-    assert attacker.argv[attacker.argv.index("--model") + 1] == "claude-opus-4-8"
+    assert isinstance(general, AgentCliChatModel) and isinstance(target, AgentCliChatModel)
+    assert general.argv[general.argv.index("--model") + 1] == "claude-opus-4-8"
     assert target.argv[target.argv.index("--model") + 1] == "haiku"
 
 
@@ -32,8 +36,8 @@ def test_target_model_carries_a_real_system_prompt_channel():
     assert target.temperature == 0
 
 
-def test_attacker_keeps_no_system_flag():
-    """Only the target needs a privilege boundary; the attacker is just generating text."""
+def test_general_model_keeps_no_system_flag():
+    """Only the target needs a privilege boundary; judging and remediation just generate text."""
     assert llm.get_chat_model().system_flag is None
 
 
@@ -85,3 +89,22 @@ def test_attacker_can_generate_is_false_for_both_agent_clis(monkeypatch):
 
     monkeypatch.setattr(llm, "resolve_attacker_backend", lambda: "claude_cli")
     assert llm.attacker_can_generate() is False
+
+
+def test_attacker_model_pins_the_model_on_the_claude_branch(monkeypatch):
+    """The claude-branch model pinning above covers get_chat_model, not the attacker. When the
+    attacker falls back to claude (last resort, no API key), it must still pin the model id
+    rather than inherit Claude Code's default, which refuses hardest of all."""
+    monkeypatch.setattr(llm, "resolve_attacker_backend", lambda: "claude_cli")
+    attacker = llm.get_attacker_model()
+
+    assert isinstance(attacker, AgentCliChatModel)
+    assert attacker.argv[attacker.argv.index("--model") + 1] == "claude-opus-4-8"
+
+
+def test_attacker_keeps_no_system_flag_on_the_claude_branch(monkeypatch):
+    """Generation needs no privilege boundary, so the attacker carries no system flag even on
+    the one backend that has one. Pinned on the real get_attacker_model, not on get_chat_model."""
+    monkeypatch.setattr(llm, "resolve_attacker_backend", lambda: "claude_cli")
+
+    assert llm.get_attacker_model().system_flag is None
