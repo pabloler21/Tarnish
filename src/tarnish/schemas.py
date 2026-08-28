@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AliasChoices, BaseModel, Field, model_validator
 
 
 def _now() -> datetime:
@@ -182,6 +182,12 @@ class CampaignResult(BaseModel):
     coverage: dict = Field(default_factory=dict)  # attempts / successes per objective
     new_findings: list[str] = Field(default_factory=list)  # fingerprints new this run
     # fingerprints that stopped reproducing this run. NOT "fixed" — see Finding.status.
-    not_reproducing_findings: list[str] = Field(default_factory=list)
+    # The `fixed_findings` alias is the same pre-release compatibility shim as
+    # Finding._upgrade_legacy_status: without it a report written before the rename loads with
+    # this list SILENTLY emptied. Removable once no report on disk predates the rename.
+    not_reproducing_findings: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("not_reproducing_findings", "fixed_findings"),
+    )
     cost_usd: float = 0.0
     created_at: datetime = Field(default_factory=_now)
