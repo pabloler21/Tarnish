@@ -49,10 +49,13 @@ def get_target_model() -> BaseChatModel:
 
 
 def attacker_can_generate() -> bool:
-    """False when the attacker role resolves to the claude CLI, which refuses attack generation.
+    """False when the attacker role resolves to either agent CLI: both refuse attack generation
+    (claude on AUP grounds; codex measured to refuse the same prompt, 2026-08-28). Only the API
+    backends are measured to generate. `ARGV` is keyed by exactly the CLI backends, so membership
+    there is the check — no hardcoded pair of names to drift if a third CLI backend is added.
     The findings are then empty rather than over-reported — the opposite failure from the harness
     privilege gap, and the caller says so."""
-    return resolve_attacker_backend() != "claude_cli"
+    return resolve_attacker_backend() not in ARGV
 
 
 def get_attacker_model() -> BaseChatModel:

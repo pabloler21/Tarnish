@@ -69,14 +69,19 @@ def test_attacker_model_uses_the_generating_backend(monkeypatch):
     assert m.system_flag is None  # codex has no system channel; not needed for generation
 
 
-def test_attacker_can_generate_is_false_only_on_claude(monkeypatch):
+def test_attacker_can_generate_is_false_for_both_agent_clis(monkeypatch):
+    """Both agent CLIs refuse attack generation: claude on AUP grounds, codex (gpt-5.5) on the
+    same prompt, measured 2026-08-28. Only the API backends are measured to generate."""
     from tarnish import llm
-
-    monkeypatch.setattr(llm, "resolve_attacker_backend", lambda: "codex_cli")
-    assert llm.attacker_can_generate() is True
 
     monkeypatch.setattr(llm, "resolve_attacker_backend", lambda: "openai")
     assert llm.attacker_can_generate() is True
+
+    monkeypatch.setattr(llm, "resolve_attacker_backend", lambda: "anthropic")
+    assert llm.attacker_can_generate() is True
+
+    monkeypatch.setattr(llm, "resolve_attacker_backend", lambda: "codex_cli")
+    assert llm.attacker_can_generate() is False
 
     monkeypatch.setattr(llm, "resolve_attacker_backend", lambda: "claude_cli")
     assert llm.attacker_can_generate() is False
