@@ -51,7 +51,7 @@ def test_explore_warns_when_attacker_cannot_generate_in_harness_mode(tmp_path, m
     assert "the claude CLI refuses" in result.output
 
 
-def test_explore_warns_when_attacker_cannot_generate_in_live_mode(monkeypatch):
+def test_explore_warns_when_attacker_cannot_generate_in_live_mode(tmp_path, monkeypatch):
     """Same warning in --live mode, since payload generation is not conditional on mode."""
     # Stub the dependencies for live mode
     target = TargetProfile(id="test", name="test", url="http://localhost:3000", owner_verified=True)
@@ -67,7 +67,7 @@ def test_explore_warns_when_attacker_cannot_generate_in_live_mode(monkeypatch):
     # Stub run_campaign
     def _run_campaign(*a, **k):
         result = CampaignResult(target=target, findings=[])
-        return result, Path("/tmp/campaign.json")
+        return result, tmp_path / "campaign.json"
 
     monkeypatch.setattr("tarnish.cli.run_campaign", _run_campaign)
 
