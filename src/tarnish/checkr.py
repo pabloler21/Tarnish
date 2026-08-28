@@ -1,8 +1,11 @@
 # src/tarnish/checkr.py
-"""`check`: replay what `explore` proved. No graph, no RAG, no specialists.
+"""`check`: replay what `explore` proved. No graph, no RAG, no specialists. This is the CI gate.
 
-Deterministic in VERDICT, not in transcript — the target answers differently every time, and the
-mandatory control plus the canary oracle produce a binary result anyway. This is the CI gate.
+Deterministic where it can be, and it tells you when it isn't. Two oracles decide without a model
+(`oracle:tool-call`, `oracle:canary`); everything else falls through to the LLM judge, and each row
+names whichever instrument decided it. Even a deterministic instrument is reading a
+non-deterministic target: the same proof delivered five times to the same unchanged target
+reproduced once (measured 2026-08-28), and `run_check` delivers it once.
 It writes nothing: recording a fix is `--fix`'s job (M3)."""
 
 from __future__ import annotations

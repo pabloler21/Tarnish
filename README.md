@@ -29,7 +29,8 @@ See `PLAN.md` for the full architecture and phase plan, and `CLAUDE.md` for buil
 A proposed fix is worthless unless it can be shown to close the specific finding. Three modes,
 built cheapest-and-most-honest first:
 
-- `rescan` (Phase 1) - apply the fix, re-run the campaign, the fingerprint diff marks it `fixed`.
+- `rescan` (Phase 1) - apply the fix, re-run the campaign; the fingerprint diff marks it
+  `not_reproducing`, and only a fix that was actually applied is reported as verified.
 - `prompt_level` (Phase 2) - if the target's system prompt is exposed, apply the hardening delta
   and re-run the attack automatically.
 - `harness` (repo mode, default) - attack a reconstruction of your agent built from your own
@@ -64,12 +65,15 @@ outside `.tarnish/`.
 ```bash
 uv run tarnish init .          # read the repo -> .tarnish/profile.json (surfaces, prompt, tools)
 uv run tarnish explore         # the campaign: 3 RAG specialists -> verdict vs control -> report
-uv run tarnish check           # replay what explore proved. Deterministic verdict, CI exit code.
+uv run tarnish check           # replay what explore proved. CI exit code, instrument named per row.
 ```
 
 `explore` is the fuzzer; `check` is the regression suite. `explore` is expensive and
-non-deterministic — it *discovers*. `check` replays what it found, cheaply, forever, and breaks
-the build when a closed hole reopens.
+non-deterministic — it *discovers*. `check` replays what it found, cheaply, forever, and fails the
+build on anything that still reproduces. It is deterministic where it can be and says when it
+isn't: two oracles decide without a model, the LLM judge decides the rest, and each row names
+which one ran. It delivers each proof once, so a vulnerability that only reproduces intermittently
+can pass a run — treat a green `check` as "did not reproduce here", not as "closed".
 
 `init` writes `.tarnish/profile.json`; `explore` writes `.tarnish/baseline.json`. **Commit both** —
 they are the gate. `.tarnish/chroma/` and `.tarnish/checkpoints.sqlite` are scratch, and `init`

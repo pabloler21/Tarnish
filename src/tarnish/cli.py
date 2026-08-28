@@ -128,7 +128,9 @@ def explore(
 
 @app.command()
 def check(root: Path = typer.Argument(Path("."), help="The repo to check.")):
-    """Replay the payloads `explore` proved. Deterministic verdict, CI exit code, no LLM campaign."""
+    """Replay the payloads `explore` proved: a CI exit code, deterministic where it can be — each
+    row names the instrument that decided it. No campaign, but it does run the target model, and
+    the judge whenever an oracle cannot decide."""
     profile = recon.load_profile(root)
     baseline = load_baseline(root, profile.id)
     if not baseline.proofs:
@@ -153,7 +155,9 @@ def check(root: Path = typer.Argument(Path("."), help="The repo to check.")):
     code = exit_code(rows)
     typer.echo(
         f"{sum(r.status in ('open', 'regression') for r in rows)} reproducing / {len(rows)} checked"
-        + ("" if code else " — clean")
+        # "nothing reproduced", not "clean": each proof was delivered once, and a proof that
+        # reproduces intermittently lands here. Exit 0 is the gate's decision, not a clean bill.
+        + ("" if code else " — nothing reproduced this run")
     )
     if code:
         typer.echo("Run `tarnish check --fix` to apply and verify the mitigation.  [M3]")
