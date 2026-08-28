@@ -48,7 +48,7 @@ def test_explore_warns_when_attacker_cannot_generate_in_harness_mode(tmp_path, m
     # Verify the warning appears
     assert result.exit_code == 0, f"Exit code: {result.exit_code}, output: {result.output}"
     assert "no backend here will generate attack payloads" in result.output
-    assert "the claude CLI refuses" in result.output
+    assert "both the claude and codex CLIs refuse" in result.output
 
 
 def test_explore_warns_when_attacker_cannot_generate_in_live_mode(tmp_path, monkeypatch):
@@ -78,4 +78,4 @@ def test_explore_warns_when_attacker_cannot_generate_in_live_mode(tmp_path, monk
     # Verify the warning appears
     assert result.exit_code == 0, f"Exit code: {result.exit_code}, output: {result.output}"
     assert "no backend here will generate attack payloads" in result.output
-    assert "the claude CLI refuses" in result.output
+    assert "both the claude and codex CLIs refuse" in result.output
