@@ -138,6 +138,17 @@ class Finding(BaseModel):
     status: Literal["new", "persisting", "not_reproducing", "regression"] = "new"
     first_seen: datetime = Field(default_factory=_now)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _upgrade_legacy_status(cls, data):
+        """Pre-release compatibility shim: reports written before `fixed` was renamed to
+        `not_reproducing` carry the old value, which no longer validates. Every reader routes
+        through here (baseline re-hydration, `tarnish report`'s whole-CampaignResult load), so
+        this is the one place it belongs. Removable once no report on disk predates the rename."""
+        if isinstance(data, dict) and data.get("status") == "fixed":
+            data = data | {"status": "not_reproducing"}
+        return data
+
 
 class Baseline(BaseModel):
     """`.tarnish/baseline.json` — committed, and the thing the CI gate reads.

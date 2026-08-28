@@ -53,13 +53,7 @@ def apply_status(result: CampaignResult, target_id: str, reports_dir: str = "rep
     # claims a fix was applied and proven — true only when one actually was. In the MVP nothing is
     # applied through Tarnish, so `fix_applied` is False and we re-hydrate the finding WITHOUT it.
     for fp in sorted(gone):
-        prior_finding = prior_findings[fp]
-        if prior_finding.get("status") == "fixed":
-            # Pre-release compatibility shim: reports written before `fixed` was renamed to
-            # `not_reproducing` carry the old value, which no longer validates. Delete this once
-            # no report on disk predates the rename.
-            prior_finding = prior_finding | {"status": "not_reproducing"}
-        resolved = Finding.model_validate(prior_finding)
+        resolved = Finding.model_validate(prior_findings[fp])
         resolved.status = "not_reproducing"
         if fix_applied:
             # ponytail: the counts and the evidence line here are synthesized from the flag, not

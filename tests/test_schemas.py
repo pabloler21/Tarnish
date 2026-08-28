@@ -43,3 +43,20 @@ def test_finding_composes_and_defaults():
 def test_finding_round_trips_through_json():
     f = _finding()
     assert Finding.model_validate_json(f.model_dump_json()) == f
+
+
+def test_a_pre_rename_campaign_result_still_loads():
+    """The shape `tarnish report` reads: a whole CampaignResult JSON written before `fixed` was
+    renamed to `not_reproducing`. Four such reports are on disk, one of them the Gate 1 evidence.
+    Validating the CampaignResult must normalize the nested finding, not raise."""
+    import json
+
+    from tarnish.schemas import CampaignResult, TargetProfile
+
+    target = TargetProfile(id="aurea", name="Aurea", url="https://x", owner_verified=True)
+    data = json.loads(CampaignResult(target=target, findings=[_finding()]).model_dump_json())
+    data["findings"][0]["status"] = "fixed"  # as written before the rename
+
+    loaded = CampaignResult.model_validate_json(json.dumps(data))
+
+    assert loaded.findings[0].status == "not_reproducing"
