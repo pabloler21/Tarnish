@@ -161,3 +161,24 @@ def test_write_baseline_keeps_prior_accepted_when_the_finding_reproduces_again(t
     baseline = load_baseline(tmp_path, "victim")
     assert baseline.fingerprints["aa11"] == "accepted"
     assert baseline.proofs["aa11"] == finding.reproduction
+
+
+def test_a_prior_report_written_before_the_rename_still_rehydrates(tmp_path):
+    """Four reports on disk (incl. the latest aurea one, and the Gate 1 evidence CLAUDE.md cites
+    by name) carry the pre-rename `"status": "fixed"`, which no longer validates. Re-hydration
+    must normalize it instead of raising."""
+    import json
+
+    target = TargetProfile(id="t", name="t", url="https://x", owner_verified=True)
+    prior = json.loads(CampaignResult(
+        target=target, findings=[_finding("fp1")],
+        created_at=__import__("datetime").datetime(2026, 1, 1, tzinfo=__import__("datetime").UTC),
+    ).model_dump_json())
+    prior["findings"][0]["status"] = "fixed"  # as written before the rename
+    (tmp_path / "t-20260101T000000.json").write_text(json.dumps(prior), encoding="utf-8")
+
+    result = CampaignResult(target=target, findings=[])
+    apply_status(result, "t", reports_dir=str(tmp_path))
+
+    rehydrated = [f for f in result.findings if f.fingerprint == "fp1"][0]
+    assert rehydrated.status == "not_reproducing"
