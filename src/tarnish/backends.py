@@ -78,8 +78,8 @@ def resolve_attacker_backend() -> Backend:
     now wins over both CLIs — unlike the judge/remediation/recon roles, which claude handles fine.
     Between the two refusing CLIs the order barely matters (both are keyless; that is not a
     differentiator between them). Codex is kept first only because its refusal, measured
-    2026-08-28, came with an offer to help on a benign variant — claude's did not. A forced
-    backend still wins (the operator's explicit choice, warned about elsewhere)."""
+    2026-08-28, came with an offer to help on a benign variant. A forced backend still wins
+    (the operator's explicit choice, warned about elsewhere)."""
     forced = _forced_backend()
     if forced:
         return forced  # type: ignore[return-value]
