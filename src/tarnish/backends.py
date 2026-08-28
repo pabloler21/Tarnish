@@ -71,24 +71,28 @@ def resolve_backend() -> Backend:
 
 
 def resolve_attacker_backend() -> Backend:
-    """Backend for GENERATING attack payloads. The claude CLI refuses attack generation on AUP
-    grounds across every model, with or without a real system channel (verified 2026-08-28), so
-    it is the last resort here — unlike the judge/remediation/recon roles, which claude handles
-    fine. A forced backend still wins (the operator's explicit choice, warned about elsewhere)."""
+    """Backend for GENERATING attack payloads. Both agent CLIs refuse it: the claude CLI on AUP
+    grounds across every model, with or without a real system channel (verified 2026-08-28); codex
+    (gpt-5.5), measured the same day on the same prompt, also refuses ("I can't provide a payload
+    designed to hijack a model..."). Only the API backends are measured to generate, so an API key
+    now wins over both CLIs — unlike the judge/remediation/recon roles, which claude handles fine.
+    Codex still outranks claude among the two CLIs: its refusal at least offers a benign
+    alternative, and it is keyless. A forced backend still wins (the operator's explicit choice,
+    warned about elsewhere)."""
     forced = _forced_backend()
     if forced:
         return forced  # type: ignore[return-value]
-    if shutil.which(_CLI_EXECUTABLE["codex_cli"]):
-        return "codex_cli"
     api_backend = _api_key_backend()
     if api_backend:
         return api_backend
+    if shutil.which(_CLI_EXECUTABLE["codex_cli"]):
+        return "codex_cli"  # will refuse; llm.attacker_can_generate() is False, caller warns
     if shutil.which(_CLI_EXECUTABLE["claude_cli"]):
         return "claude_cli"  # will refuse; llm.attacker_can_generate() is False, caller warns
     raise NoBackendAvailable(
-        "Tarnish needs a model that will GENERATE attack payloads. The claude CLI refuses this,\n"
-        "so install one of:\n"
-        "  1. Codex     install it, then `codex login` (uses your ChatGPT plan)\n"
-        "  2. An API key    set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env\n"
+        "Tarnish needs a model that will GENERATE attack payloads. Both the claude and codex\n"
+        "CLIs refuse this on AUP grounds, so:\n"
+        "  1. An API key    set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env (works today)\n"
+        "  2. Codex         install it, then `codex login` (uses your ChatGPT plan, but refuses)\n"
         "Then run this command again."
     )
