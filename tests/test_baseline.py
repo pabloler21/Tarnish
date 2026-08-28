@@ -40,7 +40,10 @@ def _finding(fp: str) -> Finding:
     )
 
 
-def test_fixed_finding_is_rehydrated_and_rescan_verified(tmp_path):
+def test_a_finding_that_stops_reproducing_is_not_claimed_verified(tmp_path):
+    """The 2026-08-28 fossil: with no fix applied, a finding that fails to reproduce was stamped
+    rescan/verified 'after the operator applied the fix'. In the MVP nothing is applied through
+    Tarnish, so that claim is always a lie."""
     target = TargetProfile(id="t", name="t", url="https://x", owner_verified=True)
     # A prior report on disk holds one finding.
     prior = CampaignResult(target=target, findings=[_finding("fp1")], created_at=__import__("datetime").datetime(2026, 1, 1, tzinfo=__import__("datetime").UTC))
@@ -48,13 +51,28 @@ def test_fixed_finding_is_rehydrated_and_rescan_verified(tmp_path):
 
     # This run reproduces nothing -> fp1 should flip to fixed.
     result = CampaignResult(target=target, findings=[])
-    apply_status(result, "t", reports_dir=str(tmp_path))
+    apply_status(result, "t", reports_dir=str(tmp_path))  # fix_applied defaults to False
 
-    assert result.fixed_findings == ["fp1"]
-    fixed = [f for f in result.findings if f.status == "fixed"]
-    assert len(fixed) == 1
-    v = fixed[0].remediation.verification
-    assert v is not None and v.mode == "rescan" and v.status == "verified"
+    assert result.fixed_findings == ["fp1"]              # the diff bookkeeping still happens
+    rehydrated = [f for f in result.findings if f.fingerprint == "fp1"]
+    if rehydrated:                                        # if carried into the report at all,
+        assert rehydrated[0].remediation.verification is None  # it must NOT claim verified
+
+
+def test_a_real_applied_fix_still_records_the_rescan_proof(tmp_path):
+    """When a fix WAS applied (M3 / manual rescan), the verified before/after is legitimate and
+    must survive."""
+    target = TargetProfile(id="t", name="t", url="https://x", owner_verified=True)
+    prior = CampaignResult(target=target, findings=[_finding("fp1")], created_at=__import__("datetime").datetime(2026, 1, 1, tzinfo=__import__("datetime").UTC))
+    (tmp_path / "t-20260101T000000.json").write_text(prior.model_dump_json(), encoding="utf-8")
+
+    result = CampaignResult(target=target, findings=[])
+    apply_status(result, "t", reports_dir=str(tmp_path), fix_applied=True)
+
+    rehydrated = [f for f in result.findings if f.fingerprint == "fp1"][0]
+    assert rehydrated.status == "fixed"
+    assert rehydrated.remediation.verification is not None
+    assert rehydrated.remediation.verification.status == "verified"
 
 
 """`.tarnish/baseline.json`: the proofs `check` replays, plus suppressions only ever set

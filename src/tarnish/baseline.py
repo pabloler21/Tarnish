@@ -2,9 +2,11 @@
 `rescan` verification uses: apply a fix, re-run, and a finding that no longer reproduces flips to
 `fixed`; a previously-fixed finding that reappears is a `regression`.
 
-A fixed finding is re-hydrated from the prior report and carried into this run's result with a
-`rescan` VerificationResult attached, so the report can show the before/after pair (its original
-proof + proof it no longer reproduces) — the product's "proof the fix works"."""
+A fixed finding is re-hydrated from the prior report and carried into this run's result. A `rescan`
+VerificationResult — the product's "proof the fix works" — is attached only when `fix_applied=True`,
+i.e. a fix was actually applied (M3's `--fix`, or a manual rescan). In the MVP nothing is applied
+through Tarnish, so by default the finding merely stopped reproducing: honest per the project's
+convention, `verification: None` = proposed, not verified."""
 
 from __future__ import annotations
 
@@ -30,7 +32,8 @@ def _latest_prior_report(target_id: str, before_iso: str, reports_dir: str) -> d
     return best
 
 
-def apply_status(result: CampaignResult, target_id: str, reports_dir: str = "reports") -> CampaignResult:
+def apply_status(result: CampaignResult, target_id: str, reports_dir: str = "reports",
+                  fix_applied: bool = False) -> CampaignResult:
     prior = _latest_prior_report(target_id, result.created_at.isoformat(), reports_dir)
     prior_findings = {f["fingerprint"]: f for f in (prior or {}).get("findings", [])}
     previous = set(prior_findings)
@@ -42,16 +45,21 @@ def apply_status(result: CampaignResult, target_id: str, reports_dir: str = "rep
     result.new_findings = sorted(new)
     result.fixed_findings = sorted(fixed)
 
-    # Re-hydrate each fixed finding from the prior report, verified by rescan: its original proof is
-    # the "before"; the re-run that no longer reproduces is the "after".
+    # A fingerprint that was present before and is absent now goes into fixed_findings for the
+    # diff and the regression gate either way. But a `rescan verified` VerificationResult claims a
+    # fix was applied and proven — true only when one actually was. In the MVP nothing is applied
+    # through Tarnish, so `fix_applied` is False and we re-hydrate the finding WITHOUT that claim.
     for fp in sorted(fixed):
         resolved = Finding.model_validate(prior_findings[fp])
         resolved.status = "fixed"
-        resolved.remediation.verification = VerificationResult(
-            mode="rescan", status="verified", attempts_rerun=1, attempts_blocked=1,
-            evidence=("Re-ran the same attack after the operator applied the fix; it no longer "
-                      "reproduces (the payload's proof signal is absent from the target's response)."),
-        )
+        if fix_applied:
+            resolved.remediation.verification = VerificationResult(
+                mode="rescan", status="verified", attempts_rerun=1, attempts_blocked=1,
+                evidence=("Re-ran the same attack after the operator applied the fix; it no longer "
+                          "reproduces (the payload's proof signal is absent from the response)."),
+            )
+        else:
+            resolved.remediation.verification = None  # honest: it stopped reproducing; unproven as a fix
         result.findings.append(resolved)
     return result
 
