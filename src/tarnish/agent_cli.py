@@ -1,8 +1,10 @@
 """A LangChain chat model that shells out to an already-authenticated coding-agent CLI.
 
-This is the seam that makes Tarnish keyless: `claude -p` and `codex exec` draw on the
-developer's existing subscription, so no API key is needed. Every caller keeps using the
-LangChain interface and knows nothing about subprocesses."""
+This is the seam that makes most of Tarnish keyless: `claude -p` and `codex exec` draw on
+the developer's existing subscription, so the target, judge, recon and remediation roles
+need no API key. Attack GENERATION is the measured exception (2026-08-28): both CLIs refuse
+that prompt on AUP grounds, which is why `get_attacker_model()` puts the API backends first.
+Every caller keeps using the LangChain interface and knows nothing about subprocesses."""
 
 from __future__ import annotations
 

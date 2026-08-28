@@ -3,7 +3,10 @@
 Autonomous multi-agent system that red-teams an LLM-powered target through its own input
 surface, judges each attack against ground truth, **proposes a fix for every finding and
 proves the fix closes the hole**, and exports a client-facing report. Find -> fix -> verify.
-Runs on the coding-agent CLI you are already logged into: no API key, no account, no telemetry.
+Runs on the coding-agent CLI you are already logged into: no account, no telemetry. One
+exception, measured 2026-08-28: *generating* the attack payloads needs an API key, because
+both the `claude` and `codex` CLIs refuse that prompt on AUP grounds. The target, judge,
+recon and remediation roles stay keyless.
 
 > Working codename. The default target is **your own repository**: Tarnish reads it, reconstructs
 > the agent from your system prompt and tool schemas, and attacks that. `--live` drives a headless
@@ -42,8 +45,11 @@ uv sync                              # create the venv, install deps + the proje
 uv run playwright install chromium   # one-time: headless browser (~115MB), only for --live
 ```
 
-No API key needed if you have `claude` or `codex` on your PATH - Tarnish uses the coding-agent
-CLI you are already logged into. Otherwise put `OPENAI_API_KEY` in a `.env`.
+`claude` or `codex` on your PATH covers the target, judge, recon and remediation roles -
+Tarnish uses the CLI you are already logged into. **Payload generation is the exception:**
+both CLIs refuse to generate attack payloads (measured 2026-08-28), so `explore` needs
+`OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in a `.env` or it will find nothing. `check` only
+replays stored proofs, so it stays keyless.
 
 Tarnish drives a headless browser to attack web targets through their real input
 surface (a PDF dropzone, a chat box), so any "drop your CV" page works with no
