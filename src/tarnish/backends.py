@@ -76,9 +76,10 @@ def resolve_attacker_backend() -> Backend:
     (gpt-5.5), measured the same day on the same prompt, also refuses ("I can't provide a payload
     designed to hijack a model..."). Only the API backends are measured to generate, so an API key
     now wins over both CLIs — unlike the judge/remediation/recon roles, which claude handles fine.
-    Codex still outranks claude among the two CLIs: its refusal at least offers a benign
-    alternative, and it is keyless. A forced backend still wins (the operator's explicit choice,
-    warned about elsewhere)."""
+    Between the two refusing CLIs the order barely matters (both are keyless; that is not a
+    differentiator between them). Codex is kept first only because its refusal, measured
+    2026-08-28, came with an offer to help on a benign variant — claude's did not. A forced
+    backend still wins (the operator's explicit choice, warned about elsewhere)."""
     forced = _forced_backend()
     if forced:
         return forced  # type: ignore[return-value]
@@ -91,8 +92,7 @@ def resolve_attacker_backend() -> Backend:
         return "claude_cli"  # will refuse; llm.attacker_can_generate() is False, caller warns
     raise NoBackendAvailable(
         "Tarnish needs a model that will GENERATE attack payloads. Both the claude and codex\n"
-        "CLIs refuse this on AUP grounds, so:\n"
-        "  1. An API key    set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env (works today)\n"
-        "  2. Codex         install it, then `codex login` (uses your ChatGPT plan, but refuses)\n"
+        "CLIs refuse this on AUP grounds, so an API key is the only route that works:\n"
+        "  set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env\n"
         "Then run this command again."
     )
