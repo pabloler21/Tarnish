@@ -43,7 +43,7 @@
   <div class="summary">
     <div>Findings<b>{{ r.findings | length }}</b></div>
     <div>New this run<b>{{ r.new_findings | length }}</b></div>
-    <div>Fixed this run<b>{{ r.fixed_findings | length }}</b></div>
+    <div>Stopped reproducing<b>{{ r.not_reproducing_findings | length }}</b></div>
     <div>Critical / High<b>{{ r.findings | selectattr("severity","in",["critical","high"]) | list | length }}</b></div>
   </div>
 

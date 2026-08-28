@@ -3,7 +3,7 @@
 `fingerprint` is a stable identity for "the same vulnerability" across runs: a normalized
 hash of (objective, technique, attacked-surface element). It deliberately takes NO payload
 text — so the same hole keeps the same identity even when the generated payload varies.
-Without this, `status` (new/persisting/fixed/regression), regression detection, and the CI
+Without this, `status` (new/persisting/not_reproducing/regression), regression detection, and the CI
 gate do not work. Never hash the payload."""
 
 from __future__ import annotations

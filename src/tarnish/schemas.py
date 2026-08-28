@@ -132,19 +132,24 @@ class Finding(BaseModel):
     control_diff: str  # the delta between the injected evaluation and the clean control
     location: str = ""  # repo mode: `file#symbol` (+ line in the report). Empty in live mode.
     remediation: Remediation
-    status: Literal["new", "persisting", "fixed", "regression"] = "new"
+    # `not_reproducing`, NOT `fixed`: all that was observed is that the payload did not
+    # reproduce on one delivery. Nothing is applied through Tarnish in this MVP, so nobody
+    # fixed anything. `remediation.verification` is where a proven fix is asserted.
+    status: Literal["new", "persisting", "not_reproducing", "regression"] = "new"
     first_seen: datetime = Field(default_factory=_now)
 
 
 class Baseline(BaseModel):
     """`.tarnish/baseline.json` — committed, and the thing the CI gate reads.
 
-    `fingerprints` holds SUPPRESSIONS only: `accepted` (you decided to live with it) or `fixed`
-    (closed, and its return is a regression). A finding that is neither fails the gate.
+    `fingerprints` holds SUPPRESSIONS only: `accepted` (you decided to live with it) or
+    `not_reproducing` (it stopped reproducing on the run that wrote this file — an observation,
+    not a proof that anyone fixed it; its return is reported as a `regression`). A finding that
+    is neither fails the gate.
     `proofs` is what `check` replays: no graph, no RAG, no specialists."""
 
     target_id: str
-    fingerprints: dict[str, Literal["accepted", "fixed"]] = Field(default_factory=dict)
+    fingerprints: dict[str, Literal["accepted", "not_reproducing"]] = Field(default_factory=dict)
     proofs: dict[str, AttackAttempt] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=_now)
 
@@ -165,6 +170,7 @@ class CampaignResult(BaseModel):
     control_baseline: str = ""  # the evaluation of the clean, un-injected CV
     coverage: dict = Field(default_factory=dict)  # attempts / successes per objective
     new_findings: list[str] = Field(default_factory=list)  # fingerprints new this run
-    fixed_findings: list[str] = Field(default_factory=list)  # fingerprints closed this run
+    # fingerprints that stopped reproducing this run. NOT "fixed" — see Finding.status.
+    not_reproducing_findings: list[str] = Field(default_factory=list)
     cost_usd: float = 0.0
     created_at: datetime = Field(default_factory=_now)

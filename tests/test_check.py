@@ -1,6 +1,7 @@
 # tests/test_check.py
 """`check` replays the stored proofs and turns each verdict into a status and an exit code.
-The regression case is the one that matters: a fingerprint marked fixed that reproduces again."""
+The regression case is the one that matters: a fingerprint the baseline recorded as
+`not_reproducing` that reproduces again."""
 
 from __future__ import annotations
 
@@ -60,8 +61,8 @@ def test_a_reproducing_finding_with_no_suppression_is_open_and_fails_the_build()
     assert exit_code(rows) == 1
 
 
-def test_a_reproducing_finding_marked_fixed_is_a_regression():
-    baseline = Baseline(target_id="victim", fingerprints={"aa11": "fixed"},
+def test_a_reproducing_finding_marked_not_reproducing_is_a_regression():
+    baseline = Baseline(target_id="victim", fingerprints={"aa11": "not_reproducing"},
                         proofs={"aa11": _proof("aa11", "TRN-111111")})
     rows = run_check(_profile(), baseline, transport=_Transport())
 
@@ -78,11 +79,12 @@ def test_an_accepted_finding_reproduces_without_failing_the_build():
     assert exit_code(rows) == 0
 
 
-def test_a_payload_that_no_longer_reproduces_is_fixed():
+def test_a_payload_that_no_longer_reproduces_is_not_reproducing_never_fixed():
+    """The label is an observation about this delivery. `check` never asserts someone fixed it."""
     baseline = Baseline(target_id="victim", proofs={"aa11": _proof("aa11", "TRN-111111")})
     rows = run_check(_profile(), baseline, transport=_Transport(vulnerable=False))
 
-    assert rows[0].status == "fixed"
+    assert rows[0].status == "not_reproducing"
     assert exit_code(rows) == 0
 
 
@@ -149,11 +151,11 @@ def test_check_names_the_instrument_that_decided_each_row():
 
 
 def test_a_payload_that_no_longer_reproduces_is_named_by_its_oracle_too():
-    """A `fixed` row is still a verdict and still names what produced it."""
+    """A `not_reproducing` row is still a verdict and still names what produced it."""
     baseline = Baseline(target_id="victim", proofs={"aa11": _proof("aa11", "TRN-111111")})
     rows = run_check(_profile(), baseline, transport=_Transport(vulnerable=False))
 
-    assert rows[0].status == "fixed"
+    assert rows[0].status == "not_reproducing"
     assert rows[0].instrument == "oracle:canary"
 
 

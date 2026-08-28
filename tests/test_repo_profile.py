@@ -40,11 +40,11 @@ def test_baseline_carries_the_proof_check_replays():
         id="a1", surface="chat_input", raw_response="ref TRN-9f3a2c approved",
         payload=Payload(objective="data", technique="injection", content="x", oracle=["TRN-9f3a2c"]),
     )
-    baseline = Baseline(target_id="victim", fingerprints={"7daf6f56": "fixed"},
+    baseline = Baseline(target_id="victim", fingerprints={"7daf6f56": "not_reproducing"},
                         proofs={"7daf6f56": attempt})
     parsed = Baseline.model_validate_json(baseline.model_dump_json())
     assert parsed.proofs["7daf6f56"].payload.oracle == ["TRN-9f3a2c"]
-    assert parsed.fingerprints["7daf6f56"] == "fixed"
+    assert parsed.fingerprints["7daf6f56"] == "not_reproducing"
 
 
 def test_finding_location_defaults_to_empty():

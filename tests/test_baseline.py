@@ -1,4 +1,4 @@
-"""Fingerprint diff: new / persisting / fixed across runs (drives status + the CI gate)."""
+"""Fingerprint diff: new / persisting / not-reproducing across runs (status + the CI gate)."""
 
 from __future__ import annotations
 
@@ -15,17 +15,17 @@ from tarnish.schemas import (
 
 def test_diff_classifies_fingerprints():
     previous = {"a", "b", "c"}
-    current = {"b", "c", "d"}  # d is new, b/c persist, a is fixed
-    new, persisting, fixed = diff(current, previous)
+    current = {"b", "c", "d"}  # d is new, b/c persist, a stopped reproducing
+    new, persisting, gone = diff(current, previous)
     assert new == {"d"}
     assert persisting == {"b", "c"}
-    assert fixed == {"a"}
+    assert gone == {"a"}
 
 
 def test_first_run_is_all_new():
-    new, persisting, fixed = diff({"a", "b"}, set())
+    new, persisting, gone = diff({"a", "b"}, set())
     assert new == {"a", "b"}
-    assert not persisting and not fixed
+    assert not persisting and not gone
 
 
 def _finding(fp: str) -> Finding:
@@ -49,14 +49,15 @@ def test_a_finding_that_stops_reproducing_is_not_claimed_verified(tmp_path):
     prior = CampaignResult(target=target, findings=[_finding("fp1")], created_at=__import__("datetime").datetime(2026, 1, 1, tzinfo=__import__("datetime").UTC))
     (tmp_path / "t-20260101T000000.json").write_text(prior.model_dump_json(), encoding="utf-8")
 
-    # This run reproduces nothing -> fp1 should flip to fixed.
+    # This run reproduces nothing -> fp1 should flip to not_reproducing.
     result = CampaignResult(target=target, findings=[])
     apply_status(result, "t", reports_dir=str(tmp_path))  # fix_applied defaults to False
 
-    assert result.fixed_findings == ["fp1"]              # the diff bookkeeping still happens
+    assert result.not_reproducing_findings == ["fp1"]    # the diff bookkeeping still happens
     rehydrated = [f for f in result.findings if f.fingerprint == "fp1"]
-    if rehydrated:                                        # if carried into the report at all,
-        assert rehydrated[0].remediation.verification is None  # it must NOT claim verified
+    assert rehydrated, "the finding must be carried into the report, not silently dropped"
+    assert rehydrated[0].status == "not_reproducing"      # never `fixed`: nobody fixed anything
+    assert rehydrated[0].remediation.verification is None  # and it must NOT claim verified
 
 
 def test_a_real_applied_fix_still_records_the_rescan_proof(tmp_path):
@@ -70,7 +71,7 @@ def test_a_real_applied_fix_still_records_the_rescan_proof(tmp_path):
     apply_status(result, "t", reports_dir=str(tmp_path), fix_applied=True)
 
     rehydrated = [f for f in result.findings if f.fingerprint == "fp1"][0]
-    assert rehydrated.status == "fixed"
+    assert rehydrated.status == "not_reproducing"
     assert rehydrated.remediation.verification is not None
     assert rehydrated.remediation.verification.status == "verified"
 
@@ -95,7 +96,7 @@ def test_write_baseline_records_proofs_but_accepts_nothing(tmp_path):
     assert baseline.fingerprints == {}, "a new finding is open, not accepted"
 
 
-def test_write_baseline_marks_fixed_and_keeps_existing_suppressions(tmp_path):
+def test_write_baseline_marks_not_reproducing_and_keeps_existing_suppressions(tmp_path):
     from tarnish.baseline import load_baseline, write_baseline
     from tarnish.schemas import Baseline, CampaignResult, TargetProfile
 
@@ -105,12 +106,12 @@ def test_write_baseline_marks_fixed_and_keeps_existing_suppressions(tmp_path):
 
     result = CampaignResult(
         target=TargetProfile(id="victim", name="victim", url="https://x", owner_verified=True),
-        findings=[_finding("aa11")], fixed_findings=["cc33"],
+        findings=[_finding("aa11")], not_reproducing_findings=["cc33"],
     )
     write_baseline(result, tmp_path)
 
     baseline = load_baseline(tmp_path, "victim")
-    assert baseline.fingerprints == {"bb22": "accepted", "cc33": "fixed"}
+    assert baseline.fingerprints == {"bb22": "accepted", "cc33": "not_reproducing"}
 
 
 def test_load_baseline_on_a_fresh_repo_is_empty(tmp_path):

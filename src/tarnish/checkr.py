@@ -17,7 +17,9 @@ from .remediation.static_map import severity_for
 from .schemas import Baseline, RepoProfile
 from .transport.harness import HarnessTransport
 
-Status = Literal["open", "regression", "accepted", "fixed"]
+# `not_reproducing`, NOT `fixed`: one delivery of the proof produced no verdict. That is an
+# observation about this run, not evidence anyone closed the hole.
+Status = Literal["open", "regression", "accepted", "not_reproducing"]
 
 
 class CheckRow(BaseModel):
@@ -48,9 +50,11 @@ def run_check(profile: RepoProfile, baseline: Baseline, transport=None) -> list[
         )
         prior = baseline.fingerprints.get(fingerprint_)
         if not verdict.succeeded:
-            status: Status = "fixed"
-        elif prior == "fixed":
-            status = "regression"  # you closed this and it came back
+            status: Status = "not_reproducing"
+        elif prior == "not_reproducing":
+            # It did not reproduce when the baseline was written and it does now. Worth flagging,
+            # but it names a change in observation — it does not assert you had closed it.
+            status = "regression"
         else:
             status = "accepted" if prior == "accepted" else "open"
         rows.append(CheckRow(
@@ -62,5 +66,9 @@ def run_check(profile: RepoProfile, baseline: Baseline, transport=None) -> list[
 
 
 def exit_code(rows: list[CheckRow]) -> int:
-    """Non-zero breaks the build. `accepted` is a decision you made; `fixed` is good news."""
+    """Non-zero breaks the build. `accepted` is a decision you made; `not_reproducing` passes.
+
+    `not_reproducing` passing is a deliberate instrument choice, not an assertion that the finding
+    is fixed: `run_check` delivers each proof once, and a proof that reproduces intermittently can
+    land here. Whether a flaky proof should break the build is an open product decision."""
     return int(any(row.status in ("open", "regression") for row in rows))
