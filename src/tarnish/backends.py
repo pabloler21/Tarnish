@@ -1,7 +1,8 @@
 """Which LLM backend to use, resolved once per process.
 
-Order is deliberate: the agent CLIs come first because they draw on a subscription the
-developer already pays for, so a keyless first run works. API keys are the CI path."""
+Order is deliberate: in `resolve_backend` the agent CLIs come first because they draw on a
+subscription the developer already pays for, so a keyless first run works, and API keys are the
+CI path. `resolve_attacker_backend` inverts that — see its docstring for the measurement why."""
 
 from __future__ import annotations
 
@@ -78,9 +79,9 @@ def resolve_attacker_backend() -> Backend:
     (gpt-5.5), measured the same day on the same prompt, also refuses ("I can't provide a payload
     designed to hijack a model..."). Only the API backends are measured to generate, so an API key
     now wins over both CLIs — unlike the judge/remediation/recon roles, which claude handles fine.
-    Between the two refusing CLIs the order barely matters (both are keyless; that is not a
-    differentiator between them). Codex is kept first only because its refusal, measured
-    2026-08-28, came with an offer to help on a benign variant. A forced backend still wins
+    Between the two refusing CLIs the order is arbitrary: both refuse, both are keyless, and
+    nothing measured separates them on this task. Codex is first because one of them had to be.
+    A forced backend still wins
     (the operator's explicit choice, warned about elsewhere)."""
     forced = _forced_backend()
     if forced:

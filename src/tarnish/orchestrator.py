@@ -24,7 +24,7 @@ from .transport.harness import HarnessTransport
 
 SPECIALISTS = {"injection": INJECTION, "leakage": LEAKAGE, "business_logic": BUSINESS_LOGIC}
 
-# Default (specialist, objective) tasks a campaign runs against a CV-evaluator surface.
+# Default (specialist, objective) tasks a campaign runs against any target surface.
 DEFAULT_TASKS: list[tuple[str, str]] = [
     ("injection", "data"),
     ("injection", "instruction"),

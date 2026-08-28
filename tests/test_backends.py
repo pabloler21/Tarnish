@@ -113,9 +113,10 @@ def test_attacker_backend_prefers_openai_over_anthropic(monkeypatch):
 
 
 def test_attacker_backend_uses_codex_when_no_key_is_set(monkeypatch):
-    """No API key, but codex is on PATH: codex still refuses the payload-gen prompt (measured
-    2026-08-28), but it is keyless and offers a benign alternative, so it stays ahead of claude
-    among the two agent CLIs."""
+    """No API key, but codex is on PATH: codex refuses the payload-gen prompt too (measured
+    2026-08-28), so this pins nothing but the arbitrary order between two refusing CLIs. Both are
+    keyless; nothing measured separates them. Still better than NoBackendAvailable, and the
+    caller warns."""
     import tarnish.backends as b
 
     monkeypatch.setattr(b, "_forced_backend", lambda: "")

@@ -52,7 +52,9 @@ def attacker_can_generate() -> bool:
     """False when the attacker role resolves to either agent CLI: both refuse attack generation
     (claude on AUP grounds; codex measured to refuse the same prompt, 2026-08-28). Only the API
     backends are measured to generate. `ARGV` is keyed by exactly the CLI backends, so membership
-    there is the check — no hardcoded pair of names to drift if a third CLI backend is added.
+    there is the check. Be clear about what that assumes: every CLI backend measured SO FAR
+    refuses, and a third one added to `ARGV` would be declared incapable here with nobody having
+    measured it. Measure a new CLI before trusting this answer about it.
     The findings are then empty rather than over-reported — the opposite failure from the harness
     privilege gap, and the caller says so."""
     return resolve_attacker_backend() not in ARGV
@@ -60,8 +62,13 @@ def attacker_can_generate() -> bool:
 
 def get_attacker_model() -> BaseChatModel:
     """The model that GENERATES payloads. Same shape as get_chat_model, but on the attacker
-    backend (claude last, because it refuses). temperature stays at the specialist's default —
-    generation wants variety."""
+    backend: API keys first, because both agent CLIs were measured to refuse and the order
+    between them is arbitrary. temperature stays at the specialist's default — generation
+    wants variety.
+
+    No `system_flag` here, unlike get_target_model: generation has no privilege boundary to
+    enforce, and claude refuses the prompt through a real system channel exactly as it does
+    through stdin (measured 2026-08-28), so passing one would buy nothing."""
     s = get_settings()
     backend = resolve_attacker_backend()
     if backend in ARGV:
@@ -92,16 +99,19 @@ def text_of(response) -> str:
 
 
 def get_chat_model(temperature: float = 0.7) -> BaseChatModel:
-    """Attack generation, judging and remediation all come through here. The backend is
-    resolved per call so tests and `llm_backend` overrides take effect without a restart."""
+    """Judging, remediation and recon come through here — the GENERAL model. Attack generation
+    no longer does: it resolves separately in `get_attacker_model()`, because this backend order
+    lands on an agent CLI that refuses to generate. The backend is resolved per call so tests and
+    `llm_backend` overrides take effect without a restart."""
     s = get_settings()
     backend = resolve_backend()
     if backend in ARGV:
         argv = list(ARGV[backend])
         if backend == "claude_cli":
-            # Pin the model: Claude Code's default (Opus 5) refuses red-team payload
-            # generation via its AUP safeguards ([cyber]); Opus 4.8 does not. VOLATILE id,
-            # so it lives in Settings — swap to `haiku` for a cheaper/faster run.
+            # Pin the model instead of inheriting Claude Code's default, so this role runs on a
+            # known id. The AUP refusal is not the reason any more: every claude model refuses
+            # payload generation (2026-08-28), and generation is not this factory's job. VOLATILE
+            # id, so it lives in Settings — swap to `haiku` for a cheaper/faster run.
             argv += ["--model", s.claude_model]
         return AgentCliChatModel(argv=argv, temperature=temperature)
     if backend == "anthropic":

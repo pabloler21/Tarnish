@@ -1,4 +1,5 @@
-"""Tarnish CLI (Typer). Phase 0 ships the `gate0` command; run/report/remediate/ci land later."""
+"""Tarnish CLI (Typer): `init` -> `explore` -> `check`, plus `report` and the Phase-0 `gate0`.
+`check --fix` (M3) and a CI subcommand (Phase 3) are the ones still missing."""
 
 from __future__ import annotations
 
@@ -27,7 +28,7 @@ app = typer.Typer(help="Tarnish — autonomous AI red-teaming (find -> fix -> ve
 
 @app.callback()
 def _root() -> None:
-    """Keep subcommands named (run/report/remediate/ci land alongside gate0 in later phases)."""
+    """Keep subcommands named instead of collapsing the app into one default command."""
 
 
 def _tracing_hint() -> None:

@@ -45,10 +45,11 @@ def test_build_replaces_stale_chunks_on_rebuild(tmp_path, monkeypatch):
         get_settings.cache_clear()
 
 
-def test_corpora_are_domain_neutral():
-    """The corpus must describe attack TECHNIQUES, not CV-evaluation instances, so a payload for a
-    support bot (or any target) isn't dragged toward resumes. The domain comes from the target
-    profile's vocabulary at generation time, never from the corpus."""
+def test_corpora_have_no_cv_vocabulary():
+    """A denylist of the ONE domain the corpora used to be locked to. It proves the CV leak is
+    gone; it does not prove domain neutrality — a corpus fully locked to some other domain would
+    pass. Named for what it checks. The domain is meant to come from the target profile's
+    vocabulary at generation time, never from the corpus."""
     import tarnish.corpora.build as cb
 
     banned = ("resume", "cv", "candidate", "recruiter", "ats", "hiring", "job applicant",

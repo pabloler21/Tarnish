@@ -167,7 +167,7 @@ class Baseline(BaseModel):
 class CampaignResult(BaseModel):
     target: TargetProfile | RepoProfile
     findings: list[Finding] = Field(default_factory=list)
-    control_baseline: str = ""  # the evaluation of the clean, un-injected CV
+    control_baseline: str = ""  # the target's response to the clean, un-injected input
     coverage: dict = Field(default_factory=dict)  # attempts / successes per objective
     new_findings: list[str] = Field(default_factory=list)  # fingerprints new this run
     # fingerprints that stopped reproducing this run. NOT "fixed" — see Finding.status.
