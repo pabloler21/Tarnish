@@ -38,6 +38,15 @@ def _forced_backend() -> str:
     return get_settings().llm_backend
 
 
+def _api_key_backend() -> Backend | None:
+    """Try to resolve from API keys in order: openai, anthropic. Return None if neither is set."""
+    keys = _api_keys()
+    for backend in ("openai", "anthropic"):
+        if keys.get(backend):
+            return backend  # type: ignore[return-value]
+    return None
+
+
 def resolve_backend() -> Backend:
     forced = _forced_backend()
     if forced:
@@ -47,10 +56,9 @@ def resolve_backend() -> Backend:
         if shutil.which(executable):
             return backend  # type: ignore[return-value]
 
-    keys = _api_keys()
-    for backend in ("openai", "anthropic"):
-        if keys.get(backend):
-            return backend  # type: ignore[return-value]
+    api_backend = _api_key_backend()
+    if api_backend:
+        return api_backend
 
     # ASCII only: this is printed to a terminal, and a Windows cp1252 console mangles the rest.
     raise NoBackendAvailable(
@@ -70,13 +78,12 @@ def resolve_attacker_backend() -> Backend:
     forced = _forced_backend()
     if forced:
         return forced  # type: ignore[return-value]
-    if shutil.which("codex"):
+    if shutil.which(_CLI_EXECUTABLE["codex_cli"]):
         return "codex_cli"
-    keys = _api_keys()
-    for backend in ("openai", "anthropic"):
-        if keys.get(backend):
-            return backend  # type: ignore[return-value]
-    if shutil.which("claude"):
+    api_backend = _api_key_backend()
+    if api_backend:
+        return api_backend
+    if shutil.which(_CLI_EXECUTABLE["claude_cli"]):
         return "claude_cli"  # will refuse; llm.attacker_can_generate() is False, caller warns
     raise NoBackendAvailable(
         "Tarnish needs a model that will GENERATE attack payloads. The claude CLI refuses this,\n"
