@@ -17,6 +17,11 @@ from .schemas import CampaignResult, RepoProfile, TargetProfile
 
 
 def _coverage(tasks: list[tuple[str, str]], findings) -> dict:
+    """Count attempts and successful findings grouped by objective.
+
+    Example return: {"instruction": {"attempts": 1, "successes": 0},
+    "data": {"attempts": 1, "successes": 1}}.
+    """
     coverage: dict[str, dict[str, int]] = {}
     for _family, objective in tasks:
         coverage.setdefault(objective, {"attempts": 0, "successes": 0})["attempts"] += 1
@@ -26,6 +31,10 @@ def _coverage(tasks: list[tuple[str, str]], findings) -> dict:
 
 
 def _persist(result: CampaignResult, reports_dir: str = "reports") -> Path:
+    """Write the campaign result as a timestamped JSON file.
+
+    Example return: Path("reports/victim-20260827T135103.json").
+    """
     Path(reports_dir).mkdir(exist_ok=True)
     path = Path(reports_dir) / f"{result.target.id}-{result.created_at.strftime('%Y%m%dT%H%M%S')}.json"
     path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
@@ -41,6 +50,11 @@ def run_campaign(
     headless: bool = True,
     max_tasks: int | None = None,
 ) -> tuple[CampaignResult, Path]:
+    """Run the campaign and return its result plus the saved JSON report path.
+
+    Example return: (CampaignResult(findings=[...]),
+    Path("reports/victim-20260827T135103.json")).
+    """
     get_langfuse()  # init before any @observe span
     assert_authorized(target)
 
