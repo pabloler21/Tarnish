@@ -12,7 +12,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 
 from .agent_cli import AgentCliChatModel
-from .backends import ARGV, resolve_backend
+from .backends import ARGV, resolve_backend, resolve_attacker_backend
 from .config import get_settings
 
 # Which CLI backends can carry a real system prompt. Without one, the persona and the payload
@@ -46,6 +46,31 @@ def get_target_model() -> BaseChatModel:
 
         return ChatAnthropic(model=s.anthropic_model, api_key=s.anthropic_api_key, temperature=0)
     return ChatOpenAI(model=s.llm_model, api_key=s.openai_api_key, temperature=0)
+
+
+def attacker_can_generate() -> bool:
+    """False when the attacker role resolves to the claude CLI, which refuses attack generation.
+    The findings are then empty rather than over-reported — the opposite failure from the harness
+    privilege gap, and the caller says so."""
+    return resolve_attacker_backend() != "claude_cli"
+
+
+def get_attacker_model() -> BaseChatModel:
+    """The model that GENERATES payloads. Same shape as get_chat_model, but on the attacker
+    backend (claude last, because it refuses). temperature stays at the specialist's default —
+    generation wants variety."""
+    s = get_settings()
+    backend = resolve_attacker_backend()
+    if backend in ARGV:
+        argv = list(ARGV[backend])
+        if backend == "claude_cli":
+            argv += ["--model", s.claude_model]
+        return AgentCliChatModel(argv=argv)
+    if backend == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+
+        return ChatAnthropic(model=s.anthropic_model, api_key=s.anthropic_api_key, temperature=0.7)
+    return ChatOpenAI(model=s.llm_model, api_key=s.openai_api_key, temperature=0.7)
 
 
 def text_of(response) -> str:

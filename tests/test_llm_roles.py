@@ -53,3 +53,30 @@ def test_privilege_gap_is_false_only_on_codex(monkeypatch):
 
     monkeypatch.setattr(llm, "resolve_backend", lambda: "codex_cli")
     assert llm.harness_has_privilege_gap() is False
+
+
+def test_attacker_model_uses_the_generating_backend(monkeypatch):
+    """The attacker resolves via resolve_attacker_backend, not resolve_backend, so a claude
+    machine with codex present generates on codex instead of refusing on claude."""
+    from tarnish import llm
+    from tarnish.agent_cli import AgentCliChatModel
+
+    monkeypatch.setattr(llm, "resolve_attacker_backend", lambda: "codex_cli")
+    m = llm.get_attacker_model()
+
+    assert isinstance(m, AgentCliChatModel)
+    assert m.argv[:2] == ["codex", "exec"]
+    assert m.system_flag is None  # codex has no system channel; not needed for generation
+
+
+def test_attacker_can_generate_is_false_only_on_claude(monkeypatch):
+    from tarnish import llm
+
+    monkeypatch.setattr(llm, "resolve_attacker_backend", lambda: "codex_cli")
+    assert llm.attacker_can_generate() is True
+
+    monkeypatch.setattr(llm, "resolve_attacker_backend", lambda: "openai")
+    assert llm.attacker_can_generate() is True
+
+    monkeypatch.setattr(llm, "resolve_attacker_backend", lambda: "claude_cli")
+    assert llm.attacker_can_generate() is False

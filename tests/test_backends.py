@@ -86,3 +86,58 @@ def test_codex_argv_allows_running_outside_a_git_repo():
     from tarnish.backends import ARGV
 
     assert "--skip-git-repo-check" in ARGV["codex_cli"]
+
+
+def test_attacker_backend_prefers_codex_over_claude(monkeypatch):
+    """The claude CLI refuses attack generation across every model (verified 2026-08-28), so the
+    attacker role must not resolve to it when anything else can generate."""
+    import tarnish.backends as b
+
+    monkeypatch.setattr(b, "_forced_backend", lambda: "")
+    monkeypatch.setattr(b.shutil, "which", lambda name: f"/usr/bin/{name}")  # both on PATH
+    monkeypatch.setattr(b, "_api_keys", lambda: {"openai": "", "anthropic": ""})
+
+    assert b.resolve_attacker_backend() == "codex_cli"
+
+
+def test_attacker_backend_prefers_an_api_key_over_claude(monkeypatch):
+    """No codex, but an OpenAI key: still avoid claude for generation."""
+    import tarnish.backends as b
+
+    monkeypatch.setattr(b, "_forced_backend", lambda: "")
+    monkeypatch.setattr(b.shutil, "which", lambda name: "/usr/bin/claude" if name == "claude" else None)
+    monkeypatch.setattr(b, "_api_keys", lambda: {"openai": "sk-x", "anthropic": ""})
+
+    assert b.resolve_attacker_backend() == "openai"
+
+
+def test_attacker_backend_falls_to_claude_only_when_alone(monkeypatch):
+    """claude is the last resort — it will refuse, and the caller warns, but it is better than
+    NoBackendAvailable."""
+    import tarnish.backends as b
+
+    monkeypatch.setattr(b, "_forced_backend", lambda: "")
+    monkeypatch.setattr(b.shutil, "which", lambda name: "/usr/bin/claude" if name == "claude" else None)
+    monkeypatch.setattr(b, "_api_keys", lambda: {"openai": "", "anthropic": ""})
+
+    assert b.resolve_attacker_backend() == "claude_cli"
+
+
+def test_attacker_backend_respects_a_forced_choice(monkeypatch):
+    """An explicit TARNISH_LLM_BACKEND wins for every role, attacker included."""
+    import tarnish.backends as b
+
+    monkeypatch.setattr(b, "_forced_backend", lambda: "anthropic")
+    assert b.resolve_attacker_backend() == "anthropic"
+
+
+def test_attacker_backend_raises_when_nothing_is_available(monkeypatch):
+    import tarnish.backends as b
+
+    monkeypatch.setattr(b, "_forced_backend", lambda: "")
+    monkeypatch.setattr(b.shutil, "which", lambda name: None)
+    monkeypatch.setattr(b, "_api_keys", lambda: {"openai": "", "anthropic": ""})
+
+    import pytest
+    with pytest.raises(b.NoBackendAvailable):
+        b.resolve_attacker_backend()

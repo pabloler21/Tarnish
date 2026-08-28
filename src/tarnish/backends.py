@@ -60,3 +60,28 @@ def resolve_backend() -> Backend:
         "  3. An API key    set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env\n"
         "Then run this command again."
     )
+
+
+def resolve_attacker_backend() -> Backend:
+    """Backend for GENERATING attack payloads. The claude CLI refuses attack generation on AUP
+    grounds across every model, with or without a real system channel (verified 2026-08-28), so
+    it is the last resort here — unlike the judge/remediation/recon roles, which claude handles
+    fine. A forced backend still wins (the operator's explicit choice, warned about elsewhere)."""
+    forced = _forced_backend()
+    if forced:
+        return forced  # type: ignore[return-value]
+    if shutil.which("codex"):
+        return "codex_cli"
+    keys = _api_keys()
+    for backend in ("openai", "anthropic"):
+        if keys.get(backend):
+            return backend  # type: ignore[return-value]
+    if shutil.which("claude"):
+        return "claude_cli"  # will refuse; llm.attacker_can_generate() is False, caller warns
+    raise NoBackendAvailable(
+        "Tarnish needs a model that will GENERATE attack payloads. The claude CLI refuses this,\n"
+        "so install one of:\n"
+        "  1. Codex     install it, then `codex login` (uses your ChatGPT plan)\n"
+        "  2. An API key    set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env\n"
+        "Then run this command again."
+    )
