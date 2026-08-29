@@ -29,13 +29,17 @@ def _collection(family: str) -> str:
 
 
 def build(family: str) -> Chroma:
-    """Embed a family's patterns into its persistent Chroma collection."""
-    return Chroma.from_documents(
-        load_chunks(family),
-        get_embeddings(),
+    """Embed a family's patterns into its persistent Chroma collection, replacing any prior
+    content (Chroma.from_documents appends, so a rebuild after editing patterns.md would leave
+    stale chunks retrievable alongside the new ones)."""
+    store = Chroma(
+        embedding_function=get_embeddings(),
         persist_directory=get_settings().chroma_dir,
         collection_name=_collection(family),
     )
+    store.reset_collection()
+    store.add_documents(load_chunks(family))
+    return store
 
 
 def build_all() -> dict[str, int]:

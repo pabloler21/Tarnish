@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, model_validator
 
 
 def _now() -> datetime:
@@ -37,13 +37,53 @@ class TargetProfile(BaseModel):
     surface: Literal["auto", "pdf_upload", "text_chat"] = "auto"
 
 
+class Surface(BaseModel):
+    """Where untrusted input enters the target. `symbol` (the enclosing function/route) is what
+    the fingerprint hashes — `line` is for display only, because lines move on every refactor."""
+
+    file: str
+    line: int
+    symbol: str
+    kind: Literal["chat_input", "document_ingest", "tool_result", "retrieved_doc"]
+
+
+class ToolSpec(BaseModel):
+    name: str
+    file: str
+    line: int
+    parameters: dict = Field(default_factory=dict)  # NOT `schema`: it shadows BaseModel.schema
+    side_effect: bool = False  # writes, charges, sends? drives severity and impact wording
+
+
+class PromptRef(BaseModel):
+    file: str
+    line: int
+    text: str  # the literal system prompt, so HarnessTransport can reconstruct the target
+
+
+class RepoProfile(BaseModel):
+    """Output of `init`, committed to the user's repo. The repo-mode counterpart of
+    TargetProfile: same role, no URL, no browser."""
+
+    id: str
+    name: str
+    root: str
+    language: Literal["typescript", "python", "other"]
+    surfaces: list[Surface] = Field(default_factory=list)
+    system_prompt: PromptRef
+    tools: list[ToolSpec] = Field(default_factory=list)
+    domain_vocabulary: list[str] = Field(default_factory=list)  # feeds canary carriers
+
+
 class Payload(BaseModel):
     objective: Objective
     technique: str  # the specialist/technique that produced it
     content: str
     hiding: HidingTechnique | None = None  # PDF surface only
     # Canary tokens planted in `content`. If any surfaces in the target's response but NOT in the
-    # control's, the payload provably landed — a deterministic, judge-free, reproducible oracle.
+    # control's, the payload provably landed — a deterministic, reproducible oracle for
+    # INGESTION. It is not judge-free: a surfaced token still goes to the judge to decide
+    # whether the target obeyed or merely quoted it while refusing (D2).
     oracle: list[str] = Field(default_factory=list)
 
 
@@ -90,23 +130,64 @@ class Finding(BaseModel):
     business_impact: str  # the consequence in the target's domain language
     reproduction: AttackAttempt
     control_diff: str  # the delta between the injected evaluation and the clean control
+    location: str = ""  # repo mode: `file#symbol` (+ line in the report). Empty in live mode.
     remediation: Remediation
-    status: Literal["new", "persisting", "fixed", "regression"] = "new"
+    # `not_reproducing`, NOT `fixed`: all that was observed is that the payload did not
+    # reproduce on one delivery. Nothing is applied through Tarnish in this MVP, so nobody
+    # fixed anything. `remediation.verification` is where a proven fix is asserted.
+    status: Literal["new", "persisting", "not_reproducing", "regression"] = "new"
     first_seen: datetime = Field(default_factory=_now)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _upgrade_legacy_status(cls, data):
+        """Pre-release compatibility shim: reports written before `fixed` was renamed to
+        `not_reproducing` carry the old value, which no longer validates. Every reader routes
+        through here (baseline re-hydration, `tarnish report`'s whole-CampaignResult load), so
+        this is the one place it belongs. Removable once no report on disk predates the rename."""
+        if isinstance(data, dict) and data.get("status") == "fixed":
+            data = data | {"status": "not_reproducing"}
+        return data
 
 
 class Baseline(BaseModel):
+    """`.tarnish/baseline.json` — committed, and the thing the CI gate reads.
+
+    `fingerprints` holds SUPPRESSIONS only: `accepted` (you decided to live with it) or
+    `not_reproducing` (it stopped reproducing on the run that wrote this file — an observation,
+    not a proof that anyone fixed it; its return is reported as a `regression`). A finding that
+    is neither fails the gate.
+    `proofs` is what `check` replays: no graph, no RAG, no specialists."""
+
     target_id: str
-    accepted_fingerprints: list[str] = Field(default_factory=list)  # must NOT break the build
+    fingerprints: dict[str, Literal["accepted", "not_reproducing"]] = Field(default_factory=dict)
+    proofs: dict[str, AttackAttempt] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=_now)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _upgrade_legacy(cls, data):
+        """Pre-M2 baselines stored a plain list. Read them as accepted. Removable once none exist."""
+        if isinstance(data, dict) and isinstance(data.get("accepted_fingerprints"), list):
+            data = dict(data)
+            legacy = data.pop("accepted_fingerprints")
+            data.setdefault("fingerprints", {fp: "accepted" for fp in legacy})
+        return data
 
 
 class CampaignResult(BaseModel):
-    target: TargetProfile
+    target: TargetProfile | RepoProfile
     findings: list[Finding] = Field(default_factory=list)
-    control_baseline: str = ""  # the evaluation of the clean, un-injected CV
+    control_baseline: str = ""  # the target's response to the clean, un-injected input
     coverage: dict = Field(default_factory=dict)  # attempts / successes per objective
     new_findings: list[str] = Field(default_factory=list)  # fingerprints new this run
-    fixed_findings: list[str] = Field(default_factory=list)  # fingerprints closed this run
+    # fingerprints that stopped reproducing this run. NOT "fixed" — see Finding.status.
+    # The `fixed_findings` alias is the same pre-release compatibility shim as
+    # Finding._upgrade_legacy_status: without it a report written before the rename loads with
+    # this list SILENTLY emptied. Removable once no report on disk predates the rename.
+    not_reproducing_findings: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("not_reproducing_findings", "fixed_findings"),
+    )
     cost_usd: float = 0.0
     created_at: datetime = Field(default_factory=_now)

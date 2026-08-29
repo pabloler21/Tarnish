@@ -40,7 +40,19 @@ class Settings(BaseSettings):
     # used by the claude_cli backend. Opus 5 (the CLI default) refuses red-team payload
     # generation via AUP safeguards; 4.8 does not. `haiku` is a cheaper/faster option.
     claude_model: str = "claude-opus-4-8"
+    # The model that PLAYS the target in harness mode. Chosen for resemblance to a production
+    # app, NOT for capability: a strong safety-trained model refuses injections a real
+    # gpt-4o-mini would obey, and that shows up as false negatives. VOLATILE id.
+    # Only honoured on the claude_cli backend (llm.get_target_model()). On openai the shared
+    # gpt-4o-mini is already production-like, so that's fine as-is. On anthropic it is currently
+    # NOT honoured: the target shares anthropic_model with the attacker/judge, which reproduces
+    # D1's third fault (a target more injection-resistant than production).
+    target_model: str = "haiku"
     anthropic_model: str = "claude-sonnet-5"  # used by the anthropic backend
+    # A nested agent-CLI call carrying a RAG-assembled prompt routinely outruns a short
+    # timeout; a trip kills the whole campaign, including work (e.g. the control run)
+    # that already succeeded. Raise it rather than guessing a bigger constant in code.
+    agent_cli_timeout: int = 600
     # fastembed model id (local, keyless). 384 dims — changing it invalidates .tarnish/chroma.
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
 

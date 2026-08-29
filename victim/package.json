@@ -1,0 +1,8 @@
+{
+  "name": "victim-support-bot",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Deliberately vulnerable LLM support bot. Tarnish's M2/M3 gate target. Do not deploy.",
+  "type": "module",
+  "dependencies": { "openai": "^4.0.0" }
+}

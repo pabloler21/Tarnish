@@ -88,3 +88,89 @@ def test_error_surfaces_stdout_when_stderr_is_empty(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="safeguards flagged"):
         AgentCliChatModel(argv=["claude", "-p"]).invoke([("human", "craft a payload")])
+
+
+def test_default_timeout_comes_from_settings(monkeypatch):
+    """The 180s literal killed a real campaign (a nested agent-CLI call with a RAG-assembled
+    prompt outran it). It must be tunable via Settings, not another guess in the same spot."""
+    from tarnish.config import get_settings
+
+    monkeypatch.setenv("AGENT_CLI_TIMEOUT", "900")
+    get_settings.cache_clear()
+    try:
+        assert AgentCliChatModel(argv=["fake-cli"]).timeout == 900
+    finally:
+        get_settings.cache_clear()
+
+
+def test_explicit_timeout_overrides_settings(monkeypatch):
+    """A caller (several tests do) that passes timeout= explicitly still wins over Settings."""
+    from tarnish.config import get_settings
+
+    monkeypatch.setenv("AGENT_CLI_TIMEOUT", "900")
+    get_settings.cache_clear()
+    try:
+        assert AgentCliChatModel(argv=["fake-cli"], timeout=5).timeout == 5
+    finally:
+        get_settings.cache_clear()
+
+
+def test_system_message_travels_by_flag_not_stdin(monkeypatch):
+    """D1: `claude -p` reads stdin as user text. A system prompt delivered there creates no
+    privilege boundary, so an injection has nothing to cross."""
+    calls: list = []
+    monkeypatch.setattr(subprocess, "run", _fake_run("ok", calls=calls))
+
+    AgentCliChatModel(argv=["claude", "-p"], system_flag="--system-prompt").invoke(
+        [("system", "You are Acme Support."), ("human", "Ticket #1042: my order is late.")]
+    )
+
+    (argv,), kwargs = calls[0]
+    assert "--system-prompt" in argv
+    assert argv[argv.index("--system-prompt") + 1] == "You are Acme Support."
+    # The untrusted turn reaches the target verbatim: no role prefix, no system prompt.
+    assert kwargs["input"] == "Ticket #1042: my order is late."
+    assert "SYSTEM:" not in kwargs["input"]
+    assert "Acme Support" not in kwargs["input"]
+
+
+def test_without_a_system_flag_the_blob_is_unchanged(monkeypatch):
+    """codex has no system-prompt channel; that path must keep working exactly as before."""
+    calls: list = []
+    monkeypatch.setattr(subprocess, "run", _fake_run("ok", calls=calls))
+
+    AgentCliChatModel(argv=["codex", "exec"]).invoke(
+        [("system", "You are Acme Support."), ("human", "hola")]
+    )
+
+    (argv,), kwargs = calls[0]
+    assert "--system-prompt" not in argv
+    assert kwargs["input"] == "SYSTEM: You are Acme Support.\n\nHUMAN: hola"
+
+
+def test_multiple_system_messages_are_joined_into_one_flag(monkeypatch):
+    calls: list = []
+    monkeypatch.setattr(subprocess, "run", _fake_run("ok", calls=calls))
+
+    AgentCliChatModel(argv=["claude", "-p"], system_flag="--system-prompt").invoke(
+        [("system", "A."), ("system", "B."), ("human", "q")]
+    )
+
+    (argv,), kwargs = calls[0]
+    assert argv[argv.index("--system-prompt") + 1] == "A.\n\nB."
+    assert kwargs["input"] == "q"
+
+
+def test_subprocess_runs_outside_the_project(monkeypatch):
+    """The CLI auto-discovers CLAUDE.md from its cwd. Inside our repo it answers as Tarnish's
+    own assistant instead of as the target — that is half of D1."""
+    from pathlib import Path
+
+    calls: list = []
+    monkeypatch.setattr(subprocess, "run", _fake_run("ok", calls=calls))
+    AgentCliChatModel(argv=["fake-cli"]).invoke([("human", "ping")])
+
+    cwd = calls[0][1]["cwd"]
+    assert cwd, "no cwd passed — the subprocess inherits the project directory"
+    assert Path(cwd).resolve() != Path.cwd().resolve()
+    assert not (Path(cwd) / "CLAUDE.md").exists()

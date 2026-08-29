@@ -11,8 +11,9 @@ __pycache__/
 
 # Secrets & local state
 .env
-.tarnish/
+/.tarnish/
 *.sqlite
 
 # Campaign outputs
 reports/
+.superpowers/

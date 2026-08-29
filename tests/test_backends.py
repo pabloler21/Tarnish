@@ -78,3 +78,81 @@ def test_get_chat_model_uses_anthropic_when_only_that_key_is_set(monkeypatch):
     monkeypatch.setattr(backends, "_forced_backend", lambda: "")
     monkeypatch.setattr(backends, "_api_keys", lambda: {"openai": "", "anthropic": "sk-ant-x"})
     assert type(get_chat_model()).__name__ == "ChatAnthropic"
+
+
+def test_codex_argv_allows_running_outside_a_git_repo():
+    """We run the CLI from a neutral temp dir, and codex refuses to start outside a git repo
+    without this flag."""
+    from tarnish.backends import ARGV
+
+    assert "--skip-git-repo-check" in ARGV["codex_cli"]
+
+
+def test_attacker_backend_prefers_api_key_over_codex(monkeypatch):
+    """Regression coverage for the 2026-08-28 measurement: codex (gpt-5.5) refuses attack-gen
+    too, on the same prompt claude also refuses. An API key must win over codex even when codex
+    is on PATH — this is the test that would have caught the old codex-first ordering."""
+    import tarnish.backends as b
+
+    monkeypatch.setattr(b, "_forced_backend", lambda: "")
+    monkeypatch.setattr(b.shutil, "which", lambda name: f"/usr/bin/{name}")  # both CLIs on PATH
+    monkeypatch.setattr(b, "_api_keys", lambda: {"openai": "sk-x", "anthropic": ""})
+
+    assert b.resolve_attacker_backend() == "openai"
+
+
+def test_attacker_backend_prefers_openai_over_anthropic(monkeypatch):
+    """Same tie-break as the general _api_key_backend() helper: openai first."""
+    import tarnish.backends as b
+
+    monkeypatch.setattr(b, "_forced_backend", lambda: "")
+    monkeypatch.setattr(b.shutil, "which", lambda name: None)
+    monkeypatch.setattr(b, "_api_keys", lambda: {"openai": "sk-x", "anthropic": "sk-ant-x"})
+
+    assert b.resolve_attacker_backend() == "openai"
+
+
+def test_attacker_backend_uses_codex_when_no_key_is_set(monkeypatch):
+    """No API key, but codex is on PATH: codex refuses the payload-gen prompt too (measured
+    2026-08-28), so this pins nothing but the arbitrary order between two refusing CLIs. Both are
+    keyless; nothing measured separates them. Still better than NoBackendAvailable, and the
+    caller warns."""
+    import tarnish.backends as b
+
+    monkeypatch.setattr(b, "_forced_backend", lambda: "")
+    monkeypatch.setattr(b.shutil, "which", lambda name: f"/usr/bin/{name}")  # both CLIs on PATH
+    monkeypatch.setattr(b, "_api_keys", lambda: {"openai": "", "anthropic": ""})
+
+    assert b.resolve_attacker_backend() == "codex_cli"
+
+
+def test_attacker_backend_falls_to_claude_only_when_alone(monkeypatch):
+    """claude is the last resort — it will refuse, and the caller warns, but it is better than
+    NoBackendAvailable."""
+    import tarnish.backends as b
+
+    monkeypatch.setattr(b, "_forced_backend", lambda: "")
+    monkeypatch.setattr(b.shutil, "which", lambda name: "/usr/bin/claude" if name == "claude" else None)
+    monkeypatch.setattr(b, "_api_keys", lambda: {"openai": "", "anthropic": ""})
+
+    assert b.resolve_attacker_backend() == "claude_cli"
+
+
+def test_attacker_backend_respects_a_forced_choice(monkeypatch):
+    """An explicit TARNISH_LLM_BACKEND wins for every role, attacker included."""
+    import tarnish.backends as b
+
+    monkeypatch.setattr(b, "_forced_backend", lambda: "anthropic")
+    assert b.resolve_attacker_backend() == "anthropic"
+
+
+def test_attacker_backend_raises_when_nothing_is_available(monkeypatch):
+    import tarnish.backends as b
+
+    monkeypatch.setattr(b, "_forced_backend", lambda: "")
+    monkeypatch.setattr(b.shutil, "which", lambda name: None)
+    monkeypatch.setattr(b, "_api_keys", lambda: {"openai": "", "anthropic": ""})
+
+    import pytest
+    with pytest.raises(b.NoBackendAvailable):
+        b.resolve_attacker_backend()

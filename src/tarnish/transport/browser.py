@@ -117,10 +117,18 @@ class BrowserTransport:
     surface, and delivers `content` through the matching interaction."""
 
     channel = "web"
+    # What this transport can actually attack. The graph asks; it no longer hardcodes a surface.
+    attackable = {"pdf_upload"}
 
     def __init__(self, *, headless: bool = True, detect_timeout_ms: int = 15000):
         self.headless = headless
         self.detect_timeout_ms = detect_timeout_ms
+
+    def control_input(self, target: TargetProfile) -> str:
+        """The mandatory control: the same carrier, no payload."""
+        from ..cv import BENIGN_CV
+
+        return BENIGN_CV
 
     def classify_surface(self, target: TargetProfile) -> str:
         """Load the page and detect the input surface kind (the orchestrator's routing input)."""

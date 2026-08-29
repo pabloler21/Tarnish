@@ -3,6 +3,8 @@ and each of the five mitigations actually does its job."""
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from tarnish.remediation.mitigations import MITIGATIONS
@@ -25,6 +27,19 @@ def test_every_objective_gets_a_backed_static_fix(objective: Objective):
     assert r.verification is None  # proposed, not verified
     assert r.remediation_class in MITIGATIONS  # the class is backed by executable code
     assert severity_for(objective) in ("critical", "high", "medium", "low")
+
+
+def test_static_details_have_no_cv_vocabulary():
+    """The `detail` string IS the deliverable the operator reads. It shipped in a gate artifact
+    telling a refund bot to "verify claimed skills/experience" — the same CV leak the corpora were
+    cleaned of. Same denylist as tests/test_corpora.py."""
+    from tarnish.remediation.static_map import _MAP
+
+    banned = ("resume", "cv", "candidate", "recruiter", "ats", "hiring", "job applicant",
+              "skills", "experience", "score", "rubric")
+    for objective, (_class, detail) in _MAP.items():
+        hits = [w for w in banned if re.search(rf"\b{w}\b", detail.lower())]
+        assert not hits, f"{objective} detail is still CV-specific: {hits}"
 
 
 def test_input_sanitization_strips_zero_width_smuggling():

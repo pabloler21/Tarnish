@@ -38,3 +38,18 @@ def test_different_surface_element_changes_fingerprint():
     assert fingerprint("data", "white_on_white", "cv_pdf") != fingerprint(
         "data", "white_on_white", "chat_message"
     )
+
+
+def test_surface_element_is_file_and_symbol_never_the_line():
+    from tarnish.fingerprint import fingerprint, surface_element
+
+    before = surface_element("src/bot.ts", "handleMessage")
+    after = surface_element("src/bot.ts", "handleMessage")  # same symbol, moved 40 lines down
+    assert before == after == "src/bot.ts#handleMessage"
+    assert "31" not in before
+
+    same = fingerprint("data", "injection", before)
+    moved = fingerprint("data", "injection", after)
+    other = fingerprint("data", "injection", surface_element("src/bot.ts", "ingestTicket"))
+    assert same == moved, "a refactor that moves lines must not invent a new finding"
+    assert same != other, "two injection points in one file must not collapse to one identity"

@@ -33,7 +33,7 @@ def _patch(monkeypatch, captured, llm_reply):
             return _Resp(llm_reply)
 
     monkeypatch.setattr(base, "get_retriever", lambda family, k=4: _Retriever())
-    monkeypatch.setattr(base, "get_chat_model", lambda *a, **k: _Model())
+    monkeypatch.setattr(base, "get_attacker_model", lambda *a, **k: _Model())
 
 
 def test_injection_specialist_produces_payload(monkeypatch):
@@ -53,3 +53,15 @@ def test_business_logic_specialist_targets_logic(monkeypatch):
     payload = BUSINESS_LOGIC.generate(TARGET, "logic")
     assert payload.objective == "logic"
     assert payload.technique == "business_logic"
+
+
+def test_specialist_generation_does_not_touch_the_general_model(monkeypatch):
+    """Payload generation must go through the attacker backend (which avoids the refusing claude
+    CLI), never the general get_chat_model. The name is gone from the module, so there is nothing
+    left that could route generation back to it."""
+    assert not hasattr(base, "get_chat_model")
+
+    captured = {}
+    _patch(monkeypatch, captured, "PAYLOAD")
+    payload = INJECTION.generate(TARGET, "instruction")
+    assert payload.content == "PAYLOAD"
