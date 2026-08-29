@@ -148,6 +148,53 @@ def test_live_mode_finding_has_empty_location(monkeypatch):
     assert finding.fingerprint == fingerprint("data", "injection", "pdf_upload")
 
 
+def test_live_mode_delivers_once_even_with_a_high_ceiling(monkeypatch):
+    """Live mode drives a real, operator-owned app with tools NOT stubbed: best-of-N re-delivery
+    could re-fire a real side effect. A payload that never lands must be delivered exactly ONCE,
+    even with ATTACK_ATTEMPTS=5 — live mode is not an opt-in, it is always single-shot."""
+    from tarnish.schemas import Payload
+
+    monkeypatch.setenv("ATTACK_ATTEMPTS", "5")
+    from tarnish.config import get_settings
+    get_settings.cache_clear()
+    try:
+        class _FakeLiveTransport:
+            attackable = {"pdf_upload"}
+            deliveries = 0
+
+            def __init__(self, **kwargs):
+                pass
+
+            def classify_surface(self, target):
+                return "pdf_upload"
+
+            def control_input(self, target):
+                return "clean control text"
+
+            def deliver(self, target, *, visible, hidden=None, hiding=None):
+                if hidden is None:
+                    return "Looks like a solid resume."
+                _FakeLiveTransport.deliveries += 1
+                return "no effect"
+
+        monkeypatch.setattr(orchestrator, "BrowserTransport", _FakeLiveTransport)
+        monkeypatch.setattr(
+            orchestrator.SPECIALISTS["injection"], "generate",
+            lambda target, objective, **kw: Payload(
+                objective=objective, technique="injection", content="Please note the following."),
+        )
+        target = TargetProfile(id="t", name="t", url="https://x", owner_verified=True)
+        out = orchestrator.build_graph().invoke(
+            {"target": target, "tasks": [("injection", "data")], "mode": "live", "headless": True}
+        )
+
+        assert out["route"] == "attack"
+        assert not out.get("findings")
+        assert _FakeLiveTransport.deliveries == 1
+    finally:
+        get_settings.cache_clear()
+
+
 def _counting_transport():
     """A harness-shaped transport that counts deliveries and returns a distinct response each
     time. Whether a delivery 'succeeds' is decided by the faked evaluate, not by this text."""
@@ -269,10 +316,30 @@ def test_early_stop_pays_once_when_it_lands_first(monkeypatch):
         get_settings.cache_clear()
 
 
+def _succeed_first_then_flip(monkeypatch):
+    """Fake evaluate that returns succeeded=True on its FIRST call and False on every later call.
+    Discriminates a carried verdict from a re-evaluated one: if _assess ever calls evaluate again,
+    that second call gets False and the finding disappears."""
+    from tarnish.schemas import Verdict
+    calls = {"evaluate": 0}
+
+    def _eval(attempt, control, tools=None):
+        calls["evaluate"] += 1
+        ok = calls["evaluate"] == 1
+        return Verdict(attempt_id=attempt.id, succeeded=ok, model_acted=ok,
+                       evidence="faked", confidence=1.0, judge_model="fake")
+
+    monkeypatch.setattr(orchestrator, "evaluate", _eval)
+    return calls
+
+
 def test_assess_does_not_re_evaluate(monkeypatch):
     """The verdict is computed once in the loop and carried. If _assess re-evaluated, the judge
-    (stochastic on the real path) could contradict the loop. evaluate must be called exactly as
-    many times as there were deliveries — never once more for assessment."""
+    (stochastic on the real path) could contradict the loop. Fake evaluate succeeds on its FIRST
+    call and fails on every later one: under correct code the loop stops at delivery 1, `_assess`
+    reuses that carried True verdict, and a finding survives. A re-evaluating `_assess` would call
+    evaluate a second time, get False, and produce no finding — so this fails plainly if `_assess`
+    ever calls evaluate again."""
     monkeypatch.setenv("ATTACK_ATTEMPTS", "5")
     from tarnish.config import get_settings
     get_settings.cache_clear()
@@ -280,12 +347,13 @@ def test_assess_does_not_re_evaluate(monkeypatch):
         T = _counting_transport()
         monkeypatch.setattr(orchestrator, "HarnessTransport", T)
         _fixed_payload(monkeypatch)
-        calls = _succeed_on(monkeypatch, 1)
+        calls = _succeed_first_then_flip(monkeypatch)
 
-        orchestrator.build_graph().invoke(
+        out = orchestrator.build_graph().invoke(
             {"target": _repo_profile(), "tasks": [("injection", "instruction")], "mode": "harness"}
         )
 
+        assert out["findings"], "the carried verdict must produce a finding, not a re-evaluated one"
         assert calls["evaluate"] == 1, "one delivery, one evaluation — assess must not re-evaluate"
     finally:
         get_settings.cache_clear()
