@@ -15,7 +15,7 @@ from .backends import resolve_attacker_backend, resolve_backend
 from .baseline import load_baseline
 from .campaign import run_campaign
 from .checkr import exit_code, run_check
-from .config import load_target
+from .config import get_settings, load_target
 from .cv import BENIGN_CV
 from .langfuse_setup import get_langfuse, tracing_enabled
 from .llm import attacker_can_generate, harness_has_privilege_gap
@@ -129,6 +129,9 @@ def explore(
     )
 
     typer.echo(f"Campaign complete. {len(result.findings)} finding(s). JSON: {json_path}")
+    if not result.findings:
+        typer.echo(f"Each payload was delivered up to {get_settings().attack_attempts} time(s) "
+                    "before this negative was declared.")
     for f in result.findings:
         location = f" {f.location}" if f.location else ""
         typer.echo(f"  [{f.severity}] {f.objective} via {f.reproduction.payload.technique}"
