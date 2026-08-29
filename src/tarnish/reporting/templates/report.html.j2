@@ -72,6 +72,10 @@
       <pre>{{ f.reproduction.payload.content }}</pre>
       <p class="label" style="margin-top:10px">Target response</p>
       <pre>{{ f.reproduction.raw_response }}</pre>
+      {% if f.reproduction.delivery_ceiling > 1 %}
+      <p class="label" style="margin-top:10px">Reliability</p>
+      <pre>Reproduced on delivery {{ f.reproduction.delivery_index }} of up to {{ f.reproduction.delivery_ceiling }} (best-of-N): the target is stochastic, and this is the observed reliability of the finding, not a guarantee it reproduces every time.</pre>
+      {% endif %}
       <p class="label" style="margin-top:10px">Control diff (the falsifiability guard)</p>
       <pre>{{ f.control_diff }}</pre>
     </div>
