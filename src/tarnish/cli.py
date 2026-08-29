@@ -129,6 +129,9 @@ def explore(
     )
 
     typer.echo(f"Campaign complete. {len(result.findings)} finding(s). JSON: {json_path}")
+    if not result.findings:
+        typer.echo(f"Each payload was delivered up to {result.delivery_ceiling} time(s) "
+                    "before this negative was declared.")
     for f in result.findings:
         location = f" {f.location}" if f.location else ""
         typer.echo(f"  [{f.severity}] {f.objective} via {f.reproduction.payload.technique}"

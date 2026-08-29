@@ -49,7 +49,9 @@
 
   {% if not r.findings %}
     <h2>No findings</h2>
-    <p>No attack in this campaign changed the target's response relative to the clean control.</p>
+    <p>No attack in this campaign changed the target's response relative to the clean control.
+       Each payload was delivered up to {{ r.delivery_ceiling }} time(s) before this negative
+       was declared.</p>
   {% endif %}
 
   {% for f in r.findings %}
@@ -72,6 +74,10 @@
       <pre>{{ f.reproduction.payload.content }}</pre>
       <p class="label" style="margin-top:10px">Target response</p>
       <pre>{{ f.reproduction.raw_response }}</pre>
+      {% if f.reproduction.delivery_ceiling > 1 %}
+      <p class="label" style="margin-top:10px">Reliability</p>
+      <pre>Landed on delivery {{ f.reproduction.delivery_index }} of up to {{ f.reproduction.delivery_ceiling }} attempted (best-of-N): the target is stochastic, so deliveries were repeated until one landed. Deliveries after the first success were not made, so this is a trial index, not a success rate.</pre>
+      {% endif %}
       <p class="label" style="margin-top:10px">Control diff (the falsifiability guard)</p>
       <pre>{{ f.control_diff }}</pre>
     </div>
@@ -93,7 +99,7 @@
       {% elif f.status == "not_reproducing" %}
         <p class="unverified">Proposed, NOT verified — and NOT proven fixed.</p>
         <p style="font-size:13px;color:var(--muted)">This finding was proven on an earlier run and did
-           not reproduce on this one. That is an observation about one delivery, not evidence that the
+           not reproduce on this one, across this run's deliveries. That is not evidence that the
            hole is closed: nothing was applied through Tarnish, and the same payload has been measured
            to reproduce intermittently against an unchanged target. Treat it as still open until a
            <code>rescan</code> after an applied fix says otherwise.</p>

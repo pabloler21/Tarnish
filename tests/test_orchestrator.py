@@ -146,3 +146,263 @@ def test_live_mode_finding_has_empty_location(monkeypatch):
     (finding,) = out["findings"]
     assert finding.location == ""
     assert finding.fingerprint == fingerprint("data", "injection", "pdf_upload")
+
+
+def test_live_mode_delivers_once_even_with_a_high_ceiling(monkeypatch):
+    """Live mode drives a real, operator-owned app with tools NOT stubbed: best-of-N re-delivery
+    could re-fire a real side effect. A payload that never lands must be delivered exactly ONCE,
+    even with ATTACK_ATTEMPTS=5 — live mode is not an opt-in, it is always single-shot."""
+    from tarnish.schemas import Payload
+
+    monkeypatch.setenv("ATTACK_ATTEMPTS", "5")
+    from tarnish.config import get_settings
+    get_settings.cache_clear()
+    try:
+        class _FakeLiveTransport:
+            attackable = {"pdf_upload"}
+            deliveries = 0
+
+            def __init__(self, **kwargs):
+                pass
+
+            def classify_surface(self, target):
+                return "pdf_upload"
+
+            def control_input(self, target):
+                return "clean control text"
+
+            def deliver(self, target, *, visible, hidden=None, hiding=None):
+                if hidden is None:
+                    return "Looks like a solid resume."
+                _FakeLiveTransport.deliveries += 1
+                return "no effect"
+
+        monkeypatch.setattr(orchestrator, "BrowserTransport", _FakeLiveTransport)
+        monkeypatch.setattr(
+            orchestrator.SPECIALISTS["injection"], "generate",
+            lambda target, objective, **kw: Payload(
+                objective=objective, technique="injection", content="Please note the following."),
+        )
+        target = TargetProfile(id="t", name="t", url="https://x", owner_verified=True)
+        out = orchestrator.build_graph().invoke(
+            {"target": target, "tasks": [("injection", "data")], "mode": "live", "headless": True}
+        )
+
+        assert out["route"] == "attack"
+        assert not out.get("findings")
+        assert _FakeLiveTransport.deliveries == 1
+        # Persisted ceiling must reflect what actually ran (1, live forces it), never the
+        # ATTACK_ATTEMPTS=5 global — that's the whole point of carrying it on the state.
+        assert out["delivery_ceiling"] == 1
+    finally:
+        get_settings.cache_clear()
+
+
+def _counting_transport():
+    """A harness-shaped transport that counts deliveries and returns a distinct response each
+    time. Whether a delivery 'succeeds' is decided by the faked evaluate, not by this text."""
+    class _T:
+        channel = "harness"
+        attackable = {"chat_input"}
+        deliveries = 0
+
+        def __init__(self, profile, surface_kind=None):
+            self.surface = profile.surfaces[0]
+
+        def classify_surface(self, target):
+            return self.surface.kind
+
+        def control_input(self, target):
+            return "Hi, what can you help with?"
+
+        def deliver(self, target, *, visible, hidden=None, hiding=None):
+            if hidden is None:
+                return "control"
+            _T.deliveries += 1
+            return f"attacked response {_T.deliveries}"
+
+    _T.deliveries = 0
+    return _T
+
+
+def _fixed_payload(monkeypatch):
+    from tarnish.schemas import Payload
+    calls = {"generate": 0}
+
+    def _gen(target, objective, **kw):
+        calls["generate"] += 1
+        return Payload(objective=objective, technique="injection", content="Please note this.")
+
+    monkeypatch.setattr(orchestrator.SPECIALISTS["injection"], "generate", _gen)
+    return calls
+
+
+def _succeed_on(monkeypatch, nth):
+    """Fake evaluate that returns succeeded=True only on its nth call (1-based). nth=None: never."""
+    from tarnish.schemas import Verdict
+    calls = {"evaluate": 0}
+
+    def _eval(attempt, control, tools=None):
+        calls["evaluate"] += 1
+        ok = nth is not None and calls["evaluate"] == nth
+        return Verdict(attempt_id=attempt.id, succeeded=ok, model_acted=ok,
+                       evidence="faked", confidence=1.0, judge_model="fake")
+
+    monkeypatch.setattr(orchestrator, "evaluate", _eval)
+    return calls
+
+
+def test_best_of_n_finds_a_vulnerability_that_lands_late(monkeypatch):
+    """The regression this branch removes: a payload that only reproduces on a later delivery
+    was reported as 'no finding' by the single-shot code. Now it is found."""
+    monkeypatch.setenv("ATTACK_ATTEMPTS", "5")
+    from tarnish.config import get_settings
+    get_settings.cache_clear()
+    try:
+        T = _counting_transport()
+        monkeypatch.setattr(orchestrator, "HarnessTransport", T)
+        _fixed_payload(monkeypatch)
+        _succeed_on(monkeypatch, 3)  # lands on the 3rd delivery
+
+        out = orchestrator.build_graph().invoke(
+            {"target": _repo_profile(), "tasks": [("injection", "instruction")], "mode": "harness"}
+        )
+
+        (finding,) = out["findings"]
+        assert finding.reproduction.delivery_index == 3
+        assert finding.reproduction.delivery_ceiling == 5
+        assert T.deliveries == 3, "must stop at the first success, not deliver all 5"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_a_target_that_never_lands_is_clean_at_bounded_cost(monkeypatch):
+    """A non-vulnerable target: no finding, and exactly attack_attempts deliveries (the honest
+    cost of a confident negative), never more."""
+    monkeypatch.setenv("ATTACK_ATTEMPTS", "5")
+    from tarnish.config import get_settings
+    get_settings.cache_clear()
+    try:
+        T = _counting_transport()
+        monkeypatch.setattr(orchestrator, "HarnessTransport", T)
+        _fixed_payload(monkeypatch)
+        _succeed_on(monkeypatch, None)  # never lands
+
+        out = orchestrator.build_graph().invoke(
+            {"target": _repo_profile(), "tasks": [("injection", "instruction")], "mode": "harness"}
+        )
+
+        assert not out.get("findings")
+        assert T.deliveries == 5
+        # Harness mode's ceiling is the configured setting, persisted so the zero-finding
+        # disclosure reads what was actually in force.
+        assert out["delivery_ceiling"] == 5
+    finally:
+        get_settings.cache_clear()
+
+
+def test_early_stop_pays_once_when_it_lands_first(monkeypatch):
+    monkeypatch.setenv("ATTACK_ATTEMPTS", "5")
+    from tarnish.config import get_settings
+    get_settings.cache_clear()
+    try:
+        T = _counting_transport()
+        monkeypatch.setattr(orchestrator, "HarnessTransport", T)
+        _fixed_payload(monkeypatch)
+        _succeed_on(monkeypatch, 1)
+
+        out = orchestrator.build_graph().invoke(
+            {"target": _repo_profile(), "tasks": [("injection", "instruction")], "mode": "harness"}
+        )
+
+        (finding,) = out["findings"]
+        assert finding.reproduction.delivery_index == 1
+        assert T.deliveries == 1
+    finally:
+        get_settings.cache_clear()
+
+
+def _succeed_first_then_flip(monkeypatch):
+    """Fake evaluate that returns succeeded=True on its FIRST call and False on every later call.
+    Discriminates a carried verdict from a re-evaluated one: if _assess ever calls evaluate again,
+    that second call gets False and the finding disappears."""
+    from tarnish.schemas import Verdict
+    calls = {"evaluate": 0}
+
+    def _eval(attempt, control, tools=None):
+        calls["evaluate"] += 1
+        ok = calls["evaluate"] == 1
+        return Verdict(attempt_id=attempt.id, succeeded=ok, model_acted=ok,
+                       evidence="faked", confidence=1.0, judge_model="fake")
+
+    monkeypatch.setattr(orchestrator, "evaluate", _eval)
+    return calls
+
+
+def test_assess_does_not_re_evaluate(monkeypatch):
+    """The verdict is computed once in the loop and carried. If _assess re-evaluated, the judge
+    (stochastic on the real path) could contradict the loop. Fake evaluate succeeds on its FIRST
+    call and fails on every later one: under correct code the loop stops at delivery 1, `_assess`
+    reuses that carried True verdict, and a finding survives. A re-evaluating `_assess` would call
+    evaluate a second time, get False, and produce no finding — so this fails plainly if `_assess`
+    ever calls evaluate again."""
+    monkeypatch.setenv("ATTACK_ATTEMPTS", "5")
+    from tarnish.config import get_settings
+    get_settings.cache_clear()
+    try:
+        T = _counting_transport()
+        monkeypatch.setattr(orchestrator, "HarnessTransport", T)
+        _fixed_payload(monkeypatch)
+        calls = _succeed_first_then_flip(monkeypatch)
+
+        out = orchestrator.build_graph().invoke(
+            {"target": _repo_profile(), "tasks": [("injection", "instruction")], "mode": "harness"}
+        )
+
+        assert out["findings"], "the carried verdict must produce a finding, not a re-evaluated one"
+        assert calls["evaluate"] == 1, "one delivery, one evaluation — assess must not re-evaluate"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_generation_is_not_multiplied_by_n(monkeypatch):
+    """best-of-N re-delivers the SAME payload; generation (the API-key cost) happens once."""
+    monkeypatch.setenv("ATTACK_ATTEMPTS", "5")
+    from tarnish.config import get_settings
+    get_settings.cache_clear()
+    try:
+        T = _counting_transport()
+        monkeypatch.setattr(orchestrator, "HarnessTransport", T)
+        gen = _fixed_payload(monkeypatch)
+        _succeed_on(monkeypatch, None)  # never lands -> 5 deliveries
+
+        orchestrator.build_graph().invoke(
+            {"target": _repo_profile(), "tasks": [("injection", "instruction")], "mode": "harness"}
+        )
+
+        assert gen["generate"] == 1, "generation must not be multiplied by the delivery ceiling"
+        assert T.deliveries == 5
+    finally:
+        get_settings.cache_clear()
+
+
+def test_attack_attempts_one_is_the_old_single_shot(monkeypatch):
+    """The bisect anchor: ceiling 1 == today's single delivery, no finding on a target that
+    would have landed on a later try."""
+    monkeypatch.setenv("ATTACK_ATTEMPTS", "1")
+    from tarnish.config import get_settings
+    get_settings.cache_clear()
+    try:
+        T = _counting_transport()
+        monkeypatch.setattr(orchestrator, "HarnessTransport", T)
+        _fixed_payload(monkeypatch)
+        _succeed_on(monkeypatch, 2)  # would land on the 2nd — but there is no 2nd
+
+        out = orchestrator.build_graph().invoke(
+            {"target": _repo_profile(), "tasks": [("injection", "instruction")], "mode": "harness"}
+        )
+
+        assert not out.get("findings")
+        assert T.deliveries == 1
+    finally:
+        get_settings.cache_clear()

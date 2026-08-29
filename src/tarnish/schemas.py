@@ -92,6 +92,12 @@ class AttackAttempt(BaseModel):
     payload: Payload
     surface: str  # the surface kind the payload was delivered through
     raw_response: str
+    # best-of-N delivery bookkeeping: which delivery (1-based) this attempt was, and the
+    # ceiling in force. On a finding's recorded (succeeding) attempt this reads "reproduced on
+    # delivery K of N" — the observed reliability. 1/1 = a single-shot delivery (pre-best-of-N
+    # and every prior persisted report).
+    delivery_index: int = 1
+    delivery_ceiling: int = 1
     trace_id: str | None = None
     timestamp: datetime = Field(default_factory=_now)
 
@@ -190,4 +196,9 @@ class CampaignResult(BaseModel):
         validation_alias=AliasChoices("not_reproducing_findings", "fixed_findings"),
     )
     cost_usd: float = 0.0
+    # The best-of-N ceiling actually in force for THIS campaign (1 in live mode; attack_attempts
+    # in harness mode) — persisted so a report states what was observed, not the CURRENT global
+    # setting. Default 1 is deliberate: every report persisted before this field existed really
+    # was single-shot, so an old file re-rendered says "delivered up to 1 time", which is true.
+    delivery_ceiling: int = 1
     created_at: datetime = Field(default_factory=_now)

@@ -16,6 +16,9 @@ def render_html(result: CampaignResult) -> str:
         loader=FileSystemLoader(str(_TEMPLATES)),
         autoescape=select_autoescape(["html", "xml", "j2"]),
     )
+    # `delivery_ceiling` is read off the CampaignResult (the ceiling actually in force for THIS
+    # campaign), never off the live `get_settings()` — a re-render after ATTACK_ATTEMPTS changes
+    # must not claim a ceiling that wasn't in force when this campaign ran.
     return env.get_template("report.html.j2").render(r=result)
 
 

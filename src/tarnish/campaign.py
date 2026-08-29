@@ -75,6 +75,7 @@ def run_campaign(
         findings=findings,
         control_baseline=final.get("control_response", ""),
         coverage=_coverage(tasks, findings),
+        delivery_ceiling=final.get("delivery_ceiling", 1),
     )
     result = apply_status(result, target.id)
     path = _persist(result)
