@@ -92,6 +92,12 @@ class AttackAttempt(BaseModel):
     payload: Payload
     surface: str  # the surface kind the payload was delivered through
     raw_response: str
+    # best-of-N delivery bookkeeping: which delivery (1-based) this attempt was, and the
+    # ceiling in force. On a finding's recorded (succeeding) attempt this reads "reproduced on
+    # delivery K of N" — the observed reliability. 1/1 = a single-shot delivery (pre-best-of-N
+    # and every prior persisted report).
+    delivery_index: int = 1
+    delivery_ceiling: int = 1
     trace_id: str | None = None
     timestamp: datetime = Field(default_factory=_now)
 

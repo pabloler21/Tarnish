@@ -53,6 +53,13 @@ class Settings(BaseSettings):
     # timeout; a trip kills the whole campaign, including work (e.g. the control run)
     # that already succeeded. Raise it rather than guessing a bigger constant in code.
     agent_cli_timeout: int = 600
+    # best-of-N: how many times a single generated payload is delivered to the target before a
+    # negative ("does not reproduce") is declared. The target is stochastic (~75% landing on
+    # victim/, measured 2026-08-29), so one delivery is one Bernoulli sample and misses a real
+    # vuln ~1 run in 4. (1-p)^N: at p=0.75, N=5 -> 0.1% miss. 1 = the old single-shot behaviour.
+    attack_attempts: int = Field(
+        default=5, validation_alias=AliasChoices("attack_attempts", "tarnish_attack_attempts")
+    )
     # fastembed model id (local, keyless). 384 dims — changing it invalidates .tarnish/chroma.
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
 
