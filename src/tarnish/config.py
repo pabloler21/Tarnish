@@ -57,6 +57,15 @@ class Settings(BaseSettings):
     # negative ("does not reproduce") is declared. The target is stochastic (~75% landing on
     # victim/, measured 2026-08-29), so one delivery is one Bernoulli sample and misses a real
     # vuln ~1 run in 4. (1-p)^N: at p=0.75, N=5 -> 0.1% miss. 1 = the old single-shot behaviour.
+    # The judge multiplies too: evaluate() calls the LLM judge on every delivery that doesn't
+    # short-circuit on a canary oracle, and only the `data` objective plants one — so for the
+    # other four DEFAULT_TASKS objectives each delivery costs a target call AND a judge call.
+    # The worst case on a non-vulnerable target is roughly 5x the round-trips, not 5x the
+    # deliveries alone.
+    # The gain is backend-dependent: get_target_model() passes temperature=0, which the
+    # agent-CLI backends (AgentCliChatModel) accept and ignore — that's where the 75%
+    # stochasticity above was measured — but the openai/anthropic backends honour it, so
+    # against an API-backed target the N deliveries are near-identical and best-of-N buys little.
     attack_attempts: int = Field(
         default=5, ge=1,
         validation_alias=AliasChoices("attack_attempts", "tarnish_attack_attempts")
