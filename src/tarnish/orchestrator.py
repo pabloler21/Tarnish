@@ -15,10 +15,11 @@ from .agents.business_logic import BUSINESS_LOGIC
 from .agents.injection import INJECTION
 from .agents.leakage import LEAKAGE
 from .canary import canary, impact
+from .config import get_settings
 from .evaluator import evaluate
 from .fingerprint import fingerprint, surface_element
 from .remediation.static_map import remediate, severity_for
-from .schemas import AttackAttempt, Finding, HidingTechnique, RepoProfile, TargetProfile
+from .schemas import AttackAttempt, Finding, HidingTechnique, RepoProfile, TargetProfile, Verdict
 from .transport.browser import BrowserTransport
 from .transport.harness import HarnessTransport
 
@@ -54,6 +55,7 @@ class CampaignState(TypedDict, total=False):
     surface_element: str  # repo mode: file#symbol — the finding's stable identity
     control_response: str
     attempts: list[AttackAttempt]
+    verdicts: list[Verdict]  # carried from _attack so _assess never re-evaluates (best-of-N)
     findings: list[Finding]
     route: str
 
@@ -91,35 +93,52 @@ def _attack(state: CampaignState) -> dict:
     target = state["target"]
     transport = _transport(state)
     carrier = transport.control_input(target)
+    control = state["control_response"]
     live = state.get("mode", "live") == "live"
     vocabulary = getattr(target, "domain_vocabulary", None)
+    tools = getattr(target, "tools", None)
+    ceiling = get_settings().attack_attempts
     attempts: list[AttackAttempt] = []
+    verdicts: list[Verdict] = []
     for family, objective in state["tasks"]:
+        # Generate ONCE — generation is the step that spends the API key. best-of-N re-delivers
+        # this same payload; it does not regenerate.
         payload = SPECIALISTS[family].generate(target, objective, surface=state["surface"])  # type: ignore[arg-type]
         updates: dict = {}
         if live:  # hiding is a PDF-rendering concern; a harness has nothing to hide text in
             updates["hiding"] = _HIDING_FOR.get(objective, "white_on_white")
-        if objective == "data":  # plant a canary for the deterministic oracle
+        if objective == "data":  # plant a canary for the deterministic oracle (fixed tokens, ok to re-deliver)
             line, tokens = canary(state["surface"], vocabulary)
             updates["content"] = f"{payload.content}\n{line}"
             updates["oracle"] = tokens
         payload = payload.model_copy(update=updates)
-        response = transport.deliver(target, visible=carrier, hidden=payload.content,
-                                     hiding=updates.get("hiding"))
-        attempts.append(
-            AttackAttempt(id=uuid.uuid4().hex[:8], payload=payload,
-                          surface=state["surface"], raw_response=response)
-        )
-    return {"attempts": attempts}
+        # Deliver up to `ceiling` times, evaluating each; stop at the first success. The
+        # deciding (attempt, verdict) — the winner, or the last failure — is what we carry.
+        attempt: AttackAttempt | None = None
+        verdict: Verdict | None = None
+        for index in range(1, ceiling + 1):
+            response = transport.deliver(target, visible=carrier, hidden=payload.content,
+                                         hiding=updates.get("hiding"))
+            attempt = AttackAttempt(
+                id=uuid.uuid4().hex[:8], payload=payload, surface=state["surface"],
+                raw_response=response, delivery_index=index, delivery_ceiling=ceiling,
+            )
+            verdict = evaluate(attempt, control, tools=tools)
+            if verdict.succeeded:
+                break
+        attempts.append(attempt)  # type: ignore[arg-type]
+        verdicts.append(verdict)  # type: ignore[arg-type]
+    return {"attempts": attempts, "verdicts": verdicts}
 
 
 def _assess(state: CampaignState) -> dict:
     control, target = state["control_response"], state["target"]
     element = state.get("surface_element") or state["surface"]
+    verdicts = {v.attempt_id: v for v in state.get("verdicts", [])}
     findings: list[Finding] = []
     for attempt in state["attempts"]:
-        verdict = evaluate(attempt, control, tools=getattr(target, "tools", None))
-        if not verdict.succeeded:
+        verdict = verdicts.get(attempt.id)
+        if verdict is None or not verdict.succeeded:
             continue
         objective = attempt.payload.objective
         findings.append(
