@@ -97,7 +97,10 @@ def _attack(state: CampaignState) -> dict:
     live = state.get("mode", "live") == "live"
     vocabulary = getattr(target, "domain_vocabulary", None)
     tools = getattr(target, "tools", None)
-    ceiling = get_settings().attack_attempts
+    # Live mode drives a real, operator-owned app with tools NOT stubbed — a side effect that
+    # fires but isn't judged a success would otherwise fire again on every re-delivery. Best-of-N
+    # is a harness-only cost/reliability trade; live stays single-shot, no opt-in.
+    ceiling = 1 if live else get_settings().attack_attempts
     attempts: list[AttackAttempt] = []
     verdicts: list[Verdict] = []
     for family, objective in state["tasks"]:
