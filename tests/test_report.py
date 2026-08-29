@@ -78,7 +78,7 @@ def test_a_not_reproducing_finding_is_never_presented_as_a_proven_fix():
     html = render_html(result)
 
     assert "NOT proven fixed" in html
-    assert "observation about one delivery" in html
+    assert "not evidence that the" in html
     # The false inference the review caught: never tell the reader non-reproduction means fixed.
     assert "flips to <code>fixed</code>" not in html
 
@@ -137,4 +137,4 @@ def test_report_omits_reliability_for_a_single_shot_finding():
         findings=[_finding("fp", verified=False, delivery_index=1, delivery_ceiling=1)],
     )
     html = render_html(result)
-    assert "Reproduced on delivery" not in html
+    assert "Landed on delivery" not in html
