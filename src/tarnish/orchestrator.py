@@ -56,6 +56,7 @@ class CampaignState(TypedDict, total=False):
     control_response: str
     attempts: list[AttackAttempt]
     verdicts: list[Verdict]  # carried from _attack so _assess never re-evaluates (best-of-N)
+    delivery_ceiling: int  # the ceiling _attack actually used (1 if live, else attack_attempts)
     findings: list[Finding]
     route: str
 
@@ -131,7 +132,7 @@ def _attack(state: CampaignState) -> dict:
                 break
         attempts.append(attempt)  # type: ignore[arg-type]
         verdicts.append(verdict)  # type: ignore[arg-type]
-    return {"attempts": attempts, "verdicts": verdicts}
+    return {"attempts": attempts, "verdicts": verdicts, "delivery_ceiling": ceiling}
 
 
 def _assess(state: CampaignState) -> dict:

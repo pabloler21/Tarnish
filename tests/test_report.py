@@ -90,6 +90,17 @@ def test_report_renders_empty():
     assert "No findings" in render_html(result)
 
 
+def test_old_report_with_no_delivery_ceiling_field_defaults_to_one():
+    """A CampaignResult built without `delivery_ceiling` (every report persisted before this
+    field existed) must default to 1 — the truthful value, since every one of those reports
+    really was single-shot — and the empty-findings copy must say so, not read a live setting."""
+    result = CampaignResult(
+        target=TargetProfile(id="aurea", name="Aurea", url="https://x", owner_verified=True),
+    )
+    assert result.delivery_ceiling == 1
+    assert "delivered up to 1 time" in render_html(result)
+
+
 def test_report_renders_a_repo_mode_campaign():
     """A RepoProfile target has no url; the header and the finding location must still render."""
     from tarnish.schemas import (

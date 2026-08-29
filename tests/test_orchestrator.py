@@ -191,6 +191,9 @@ def test_live_mode_delivers_once_even_with_a_high_ceiling(monkeypatch):
         assert out["route"] == "attack"
         assert not out.get("findings")
         assert _FakeLiveTransport.deliveries == 1
+        # Persisted ceiling must reflect what actually ran (1, live forces it), never the
+        # ATTACK_ATTEMPTS=5 global — that's the whole point of carrying it on the state.
+        assert out["delivery_ceiling"] == 1
     finally:
         get_settings.cache_clear()
 
@@ -291,6 +294,9 @@ def test_a_target_that_never_lands_is_clean_at_bounded_cost(monkeypatch):
 
         assert not out.get("findings")
         assert T.deliveries == 5
+        # Harness mode's ceiling is the configured setting, persisted so the zero-finding
+        # disclosure reads what was actually in force.
+        assert out["delivery_ceiling"] == 5
     finally:
         get_settings.cache_clear()
 
