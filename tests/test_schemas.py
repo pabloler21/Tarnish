@@ -128,3 +128,21 @@ def test_attack_attempts_setting_reads_the_env(monkeypatch):
         assert get_settings().attack_attempts == 3
     finally:
         get_settings.cache_clear()
+
+
+def test_attack_attempts_rejects_a_ceiling_below_one(monkeypatch):
+    """A 0/negative ceiling would make _attack's delivery loop record no attempt at all,
+    crashing _assess with an AttributeError on a None. Reject it at the settings boundary
+    instead, as a clean validation error."""
+    import pytest
+    from pydantic import ValidationError
+
+    from tarnish.config import get_settings
+
+    monkeypatch.setenv("ATTACK_ATTEMPTS", "0")
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(ValidationError):
+            get_settings()
+    finally:
+        get_settings.cache_clear()
