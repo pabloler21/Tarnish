@@ -65,14 +65,19 @@ h1 em{font-style:normal;color:var(--steel)}
 .btn.sec:hover{border-color:var(--fg-3);background:var(--surface)}
 
 .install{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:6px;
-  background:var(--sunk);overflow:hidden;margin-top:32px;max-width:660px}
-.install code{padding:13px 16px;color:var(--fg);flex:1;overflow-x:auto;white-space:nowrap;font-size:13.5px}
+  background:var(--sunk);overflow:hidden;margin-top:32px;width:fit-content;max-width:100%}
+.install code{padding:13px 16px;color:var(--fg);flex:1;min-width:0;font-size:13.5px;
+  line-height:1.65;white-space:normal;overflow-wrap:anywhere}
 .install code .p{color:var(--steel)}
 .install button{border:none;border-left:1px solid var(--line);background:transparent;
-  padding:0 17px;color:var(--fg-3);cursor:pointer;font-family:inherit;font-size:11px;
-  letter-spacing:.11em;text-transform:uppercase;transition:color .15s}
+  padding:0 15px;color:var(--fg-3);cursor:pointer;display:flex;align-items:center;
+  transition:color .15s}
 .install button:hover{color:var(--steel)}
+.install button svg{width:15px;height:15px;display:block}
+.install button .tick{display:none}
 .install button[data-done]{color:var(--ok)}
+.install button[data-done] .tick{display:block}
+.install button[data-done] .sheets{display:none}
 
 /* ── stats ───────────────────────────────────────── */
 .stats{display:grid;grid-template-columns:repeat(3,1fr);
@@ -166,7 +171,17 @@ footer a:hover{color:var(--fg)}
     </div>
     <div class="install">
       <code class="mono" id="clone"><span class="p">$</span> git clone https://github.com/pabloler21/Tarnish &amp;&amp; cd Tarnish &amp;&amp; uv sync</code>
-      <button type="button" id="copy" aria-label="Copy the install command">Copy</button>
+      <button type="button" id="copy" aria-label="Copy the install command" title="Copy">
+        <svg class="sheets" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        <svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 6 9 17l-5-5"></path>
+        </svg>
+      </button>
     </div>
   </header>
 
@@ -294,10 +309,13 @@ document.getElementById('copy').addEventListener('click', function () {
   var btn = this;
   var cmd = document.getElementById('clone').textContent.replace(/^\s*\$\s*/, '');
   navigator.clipboard.writeText(cmd).then(function () {
-    btn.textContent = 'Copied';
     btn.setAttribute('data-done', '');
-    setTimeout(function () { btn.textContent = 'Copy'; btn.removeAttribute('data-done'); }, 1800);
-  }).catch(function () { btn.textContent = 'Press ⌘C'; });
+    btn.setAttribute('aria-label', 'Copied');
+    setTimeout(function () {
+      btn.removeAttribute('data-done');
+      btn.setAttribute('aria-label', 'Copy the install command');
+    }, 1800);
+  }).catch(function () { btn.setAttribute('aria-label', 'Copy failed — select the line and copy it'); });
 });
 </script>
 </body>
