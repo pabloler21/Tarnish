@@ -1,0 +1,21 @@
+# Tarnish landing page — Caddy v2 (verified against 2.11.4, 2026-06).
+#
+# Caddy gets the TLS certificate from Let's Encrypt on its own the first time it
+# serves this name. That needs ports 80 AND 443 reachable from the internet: 80
+# is where the ACME challenge lands, and closing it breaks renewal three months
+# later, not today.
+#
+# Replace the hostname with the DuckDNS subdomain you registered.
+
+tarnish.duckdns.org {
+	root * /srv/tarnish/docs
+	file_server
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		# The page is one static file — no reason for a browser to hold it long.
+		Cache-Control "public, max-age=300"
+	}
+}
