@@ -3,8 +3,8 @@
 Autonomous multi-agent system that red-teams an LLM-powered target through its own input
 surface, judges each attack against ground truth, **proposes a fix for every finding and, once a
 fix is applied, re-runs the attack to prove it closes the hole**, and exports a client-facing
-report. Find -> fix -> verify. Nothing is applied through Tarnish yet, so today every fix ships
-as proposed-not-verified, and the report says which it is.
+report. Find -> fix -> verify. A fix is reported as verified only when a re-run proved it closes
+the finding; anything else is reported as proposed.
 
 Runs on the coding-agent CLI you are already logged into: no account, no telemetry. One
 exception, measured 2026-08-28: *generating* the attack payloads needs an API key, because
@@ -16,7 +16,7 @@ recon and remediation roles stay keyless.
 > browser against a deployed target instead (configured in a YAML file, never hardcoded) — that is
 > how **Aurea**, a CV-evaluation agent whose only input surface is an uploaded PDF, is exercised.
 
-See `PLAN.md` for the full architecture and phase plan, and `CLAUDE.md` for build conventions.
+See `CLAUDE.md` for the architecture and build conventions.
 
 ## Non-negotiables
 
@@ -29,18 +29,16 @@ See `PLAN.md` for the full architecture and phase plan, and `CLAUDE.md` for buil
 
 ## How each finding is verified
 
-A proposed fix is worthless unless it can be shown to close the specific finding. Three modes,
-built cheapest-and-most-honest first:
+A proposed fix is worthless unless it can be shown to close the specific finding. Every finding
+ships with a fix, and the report states which of the two it is:
 
-- `rescan` (Phase 1) - apply the fix, re-run the campaign; the fingerprint diff marks it
-  `not_reproducing`, and only a fix that was actually applied is reported as verified.
-- `prompt_level` (Phase 2) - if the target's system prompt is exposed, apply the hardening delta
-  and re-run the attack automatically.
-- `harness` (repo mode, default) - attack a reconstruction of your agent built from your own
-  system prompt and tool schemas; the report states the exact, scoped claim ("this attack, at this
-  layer" - never "the target is patched"). Nothing of yours is booted, called or charged.
+- **Verified** - the fix was applied and the campaign re-run: the fingerprint no longer reproduces,
+  and the report renders the before/after pair as proof.
+- **Proposed** - the fix is there, nothing has re-run against it, and the report says exactly that.
 
-`verification: None` means **proposed, not verified**, and the report says exactly that.
+Findings are produced against a reconstruction of your agent, built from your own system prompt
+and tool schemas, so the report states the exact, scoped claim ("this attack, at this layer" -
+never "the target is patched"). Nothing of yours is booted, called or charged.
 
 ## Setup
 

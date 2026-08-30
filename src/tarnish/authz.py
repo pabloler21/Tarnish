@@ -26,6 +26,5 @@ def assert_authorized(target: TargetProfile | RepoProfile) -> None:
     if not target.owner_verified:
         raise AuthorizationError(
             f"Target '{target.id}' is not owner-verified. Tarnish only attacks targets the "
-            "operator has proven they own. Set owner_verified: true in the target profile "
-            "(real ownership proof — DNS TXT / file-at-path / prompt token — lands in Phase 3)."
+            "operator has proven they own. Set owner_verified: true in the target profile."
         )

@@ -1,5 +1,4 @@
-"""Tarnish CLI (Typer): `init` -> `explore` -> `check`, plus `report` and the Phase-0 `gate0`.
-`check --fix` (M3) and a CI subcommand (Phase 3) are the ones still missing."""
+"""Tarnish CLI (Typer): `init` -> `explore` -> `check`, plus `report` and `gate0`."""
 
 from __future__ import annotations
 
@@ -66,7 +65,7 @@ def gate0(
     target: str = typer.Option("aurea", help="Target profile id (targets/<id>.yaml)."),
     headless: bool = typer.Option(True, help="Run the browser headless."),
 ):
-    """Phase 0 gate: send ONE benign request to the target and trace it in Langfuse. No attacks."""
+    """Send ONE benign request to a live target and trace it in Langfuse. No attacks."""
     get_langfuse()  # configure env + init the Langfuse client BEFORE the first @observe span
     profile = load_target(target)
     assert_authorized(profile)
@@ -175,7 +174,7 @@ def check(root: Path = typer.Argument(Path("."), help="The repo to check.")):
         + ("" if code else " — nothing reproduced this run")
     )
     if code:
-        typer.echo("Run `tarnish check --fix` to apply and verify the mitigation.  [M3]")
+        typer.echo("The proposed fix for each finding is in the `tarnish explore` report.")
     raise typer.Exit(code)
 
 
